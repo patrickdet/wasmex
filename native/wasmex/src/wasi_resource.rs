@@ -18,6 +18,22 @@ pub struct WasiResourceWrapper {
 #[rustler::resource_impl()]
 impl rustler::Resource for WasiResourceWrapper {}
 
+impl Drop for WasiResourceWrapper {
+    fn drop(&mut self) {
+        #[cfg(debug_assertions)]
+        {
+            let type_name = match &self.resource_type {
+                ResourceType::GuestDefined { type_name } => type_name.clone(),
+                ResourceType::HostDefined { type_name } => type_name.clone(),
+            };
+            eprintln!(
+                "Dropping WasiResourceWrapper: type={}, store_id={}, owned={}",
+                type_name, self.store_id, self.is_owned
+            );
+        }
+    }
+}
+
 #[rustler::nif(name = "resource_drop")]
 pub fn resource_drop(
     resource: ResourceArc<WasiResourceWrapper>,

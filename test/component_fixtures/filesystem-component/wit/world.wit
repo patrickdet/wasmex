@@ -1,0 +1,20 @@
+package test:filesystem;
+
+interface types {
+    resource file-handle {
+        read: func(length: u32) -> result<list<u8>, string>;
+        write: func(data: list<u8>) -> result<u32, string>;
+        close: func();
+    }
+
+    resource directory {
+        create-file: func(name: string) -> result<file-handle, string>;
+        list-files: func() -> list<string>;
+    }
+    
+    create-test-directory: func() -> directory;
+}
+
+world filesystem-test {
+    export types;
+}

@@ -1,8 +1,11 @@
-#[allow(warnings)]
-mod bindings;
+#![cfg(target_os = "wasi")]
 
-use bindings::exports::component::counter::types::{Guest as TypesGuest, GuestCounter, Counter as TypesCounter, CounterBorrow};
-use bindings::Guest;
+wit_bindgen::generate!({
+    path: "wit",
+    world: "example",
+});
+
+use self::exports::component::counter::types::{Guest as TypesGuest, GuestCounter, Counter as TypesCounter, CounterBorrow};
 use std::cell::RefCell;
 
 struct Component;
@@ -52,4 +55,4 @@ impl GuestCounter for Counter {
     }
 }
 
-bindings::export!(Component with_types_in bindings);
+export!(Component);

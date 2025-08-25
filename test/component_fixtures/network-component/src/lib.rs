@@ -1,13 +1,15 @@
-#[allow(warnings)]
-mod bindings;
+#![cfg(target_os = "wasi")]
 
-use bindings::exports::test::network::types::{
+wit_bindgen::generate!({
+    path: "wit",
+    world: "network-test",
+});
+
+use self::exports::test::network::types::{
     Guest as TypesGuest, 
     GuestTcpSocket, GuestUdpSocket, GuestHttpClient, GuestHttpResponse,
-    TcpSocket as TypesTcpSocket, UdpSocket as TypesUdpSocket, 
-    HttpClient as TypesHttpClient, HttpResponse as TypesHttpResponse,
+    TcpSocket, UdpSocket, HttpClient, HttpResponse,
 };
-use bindings::Guest;
 use std::cell::RefCell;
 
 struct NetworkComponent;
@@ -24,8 +26,8 @@ impl TypesGuest for NetworkComponent {
     type HttpClient = HttpClientImpl;
     type HttpResponse = HttpResponseImpl;
     
-    fn create_tcp_socket() -> TypesTcpSocket {
-        TypesTcpSocket::new(TcpSocketImpl {
+    fn create_tcp_socket() -> TcpSocket {
+        TcpSocket::new(TcpSocketImpl {
             connected: RefCell::new(false),
             address: RefCell::new(None),
             port: RefCell::new(None),
@@ -33,8 +35,8 @@ impl TypesGuest for NetworkComponent {
         })
     }
     
-    fn create_udp_socket() -> TypesUdpSocket {
-        TypesUdpSocket::new(UdpSocketImpl {
+    fn create_udp_socket() -> UdpSocket {
+        UdpSocket::new(UdpSocketImpl {
             bound: RefCell::new(false),
             address: RefCell::new(None),
             port: RefCell::new(None),
@@ -42,8 +44,8 @@ impl TypesGuest for NetworkComponent {
         })
     }
     
-    fn create_http_client() -> TypesHttpClient {
-        TypesHttpClient::new(HttpClientImpl {})
+    fn create_http_client() -> HttpClient {
+        HttpClient::new(HttpClientImpl {})
     }
 }
 
@@ -143,8 +145,8 @@ impl GuestUdpSocket for UdpSocketImpl {
 struct HttpClientImpl {}
 
 impl GuestHttpClient for HttpClientImpl {
-    fn request(&self, method: String, url: String, _headers: Vec<(String, String)>, _body: Option<Vec<u8>>) -> Result<TypesHttpResponse, String> {
-        Ok(TypesHttpResponse::new(HttpResponseImpl {
+    fn request(&self, method: String, url: String, _headers: Vec<(String, String)>, _body: Option<Vec<u8>>) -> Result<HttpResponse, String> {
+        Ok(HttpResponse::new(HttpResponseImpl {
             status_code: RefCell::new(200),
             headers_list: RefCell::new(vec![
                 ("content-type".to_string(), "text/plain".to_string()),
@@ -175,4 +177,4 @@ impl GuestHttpResponse for HttpResponseImpl {
     }
 }
 
-bindings::export!(NetworkComponent with_types_in bindings);
+export!(NetworkComponent);

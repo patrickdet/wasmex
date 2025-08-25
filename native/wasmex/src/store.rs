@@ -150,6 +150,24 @@ pub struct ComponentStoreResource {
 #[rustler::resource_impl()]
 impl rustler::Resource for ComponentStoreResource {}
 
+impl Drop for ComponentStoreResource {
+    fn drop(&mut self) {
+        if let Ok(store) = self.inner.lock() {
+            let store_id = store.data().store_id;
+            let resource_count = store.data().resource_registry.count_active_resources();
+            
+            if resource_count > 0 {
+                eprintln!(
+                    "Store {} being dropped with {} active resources, clearing registry",
+                    store_id, resource_count
+                );
+            }
+            
+            store.data().resource_registry.clear();
+        }
+    }
+}
+
 #[rustler::resource_impl()]
 impl rustler::Resource for StoreOrCallerResource {}
 

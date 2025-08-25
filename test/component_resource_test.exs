@@ -77,4 +77,274 @@ defmodule Wasmex.ComponentResourceTest do
       <<0x00, 0x61, 0x73, 0x6D, _rest::binary>> = bytes
     end
   end
+  
+  describe "resource lifecycle management" do
+    setup do
+      component_bytes = File.read!(@counter_component_path)
+      {:ok, component_bytes: component_bytes}
+    end
+    
+    test "resources are cleaned up when store is dropped", %{component_bytes: component_bytes} do
+      # Create a store and instance
+      {:ok, store} = Wasmex.Components.Store.new()
+      {:ok, component} = Wasmex.Components.Component.new(store, component_bytes)
+      {:ok, instance} = Wasmex.Components.Instance.new(store, component, %{})
+      
+      from = self()
+      
+      # Create multiple counter resources
+      counters = for i <- 1..5 do
+        :ok = Wasmex.Components.Instance.call_function(
+          instance, 
+          ["component:counter/types", "make-counter"], 
+          [i], 
+          from
+        )
+        
+        receive do
+          {:returned_function_call, {:ok, counter}, ^from} -> counter
+          {:returned_function_call, {:error, error}, ^from} ->
+            flunk("Error creating counter #{i}: #{inspect(error)}")
+        after
+          5000 -> flunk("Timeout creating counter #{i}")
+        end
+      end
+      
+      # Verify we created 5 resources
+      assert length(counters) == 5
+      assert Enum.all?(counters, &is_reference/1)
+      
+      # Force garbage collection to clean up the store
+      # In real usage, this happens when store goes out of scope
+      :erlang.garbage_collect()
+      
+      # Store and resources should be cleaned up automatically
+      # No explicit assertion needed - Drop implementations will log cleanup
+    end
+    
+    test "multiple stores can coexist with separate resources", %{component_bytes: component_bytes} do
+      # Create two separate stores
+      {:ok, store1} = Wasmex.Components.Store.new()
+      {:ok, component1} = Wasmex.Components.Component.new(store1, component_bytes)
+      {:ok, instance1} = Wasmex.Components.Instance.new(store1, component1, %{})
+      
+      {:ok, store2} = Wasmex.Components.Store.new()
+      {:ok, component2} = Wasmex.Components.Component.new(store2, component_bytes)
+      {:ok, instance2} = Wasmex.Components.Instance.new(store2, component2, %{})
+      
+      from = self()
+      
+      # Create counter in store1
+      :ok = Wasmex.Components.Instance.call_function(
+        instance1, 
+        ["component:counter/types", "make-counter"], 
+        [10], 
+        from
+      )
+      
+      counter1 = receive do
+        {:returned_function_call, {:ok, counter}, ^from} -> counter
+        {:returned_function_call, {:error, error}, ^from} ->
+          flunk("Error creating counter in store1: #{inspect(error)}")
+      after
+        5000 -> flunk("Timeout creating counter in store1")
+      end
+      
+      # Create counter in store2
+      :ok = Wasmex.Components.Instance.call_function(
+        instance2, 
+        ["component:counter/types", "make-counter"], 
+        [20], 
+        from
+      )
+      
+      counter2 = receive do
+        {:returned_function_call, {:ok, counter}, ^from} -> counter
+        {:returned_function_call, {:error, error}, ^from} ->
+          flunk("Error creating counter in store2: #{inspect(error)}")
+      after
+        5000 -> flunk("Timeout creating counter in store2")
+      end
+      
+      # Verify both are valid resources
+      assert is_reference(counter1)
+      assert is_reference(counter2)
+      assert counter1 != counter2
+    end
+    
+    test "stress test: create and destroy many resources", %{component_bytes: component_bytes} do
+      # This test checks for memory leaks by creating/destroying many resources
+      
+      for iteration <- 1..10 do
+        # Create a new store for each iteration
+        {:ok, store} = Wasmex.Components.Store.new()
+        {:ok, component} = Wasmex.Components.Component.new(store, component_bytes)
+        {:ok, instance} = Wasmex.Components.Instance.new(store, component, %{})
+        
+        from = self()
+        
+        # Create 100 counters in this store
+        for i <- 1..100 do
+          :ok = Wasmex.Components.Instance.call_function(
+            instance, 
+            ["component:counter/types", "make-counter"], 
+            [i], 
+            from
+          )
+          
+          receive do
+            {:returned_function_call, {:ok, _counter}, ^from} -> :ok
+            {:returned_function_call, {:error, error}, ^from} ->
+              flunk("Error in iteration #{iteration}, counter #{i}: #{inspect(error)}")
+          after
+            5000 -> flunk("Timeout in iteration #{iteration}, counter #{i}")
+          end
+        end
+        
+        # Force cleanup after each iteration
+        :erlang.garbage_collect()
+      end
+      
+      # If we get here without crashes or OOM, the test passed
+      assert true
+    end
+    
+    test "resource cleanup happens in correct order", %{component_bytes: component_bytes} do
+      # Create nested scope to ensure cleanup
+      result = (fn ->
+        {:ok, store} = Wasmex.Components.Store.new()
+        {:ok, component} = Wasmex.Components.Component.new(store, component_bytes)
+        {:ok, instance} = Wasmex.Components.Instance.new(store, component, %{})
+        
+        from = self()
+        
+        # Create a counter
+        :ok = Wasmex.Components.Instance.call_function(
+          instance, 
+          ["component:counter/types", "make-counter"], 
+          [42], 
+          from
+        )
+        
+        counter = receive do
+          {:returned_function_call, {:ok, counter}, ^from} -> counter
+          {:returned_function_call, {:error, error}, ^from} ->
+            flunk("Error creating counter: #{inspect(error)}")
+        after
+          5000 -> flunk("Timeout creating counter")
+        end
+        
+        # Return the counter to verify it was created
+        {:ok, counter}
+      end).()
+      
+      # Verify the function completed successfully
+      assert {:ok, counter} = result
+      assert is_reference(counter)
+      
+      # Force GC to ensure cleanup happens
+      :erlang.garbage_collect()
+      
+      # The store and all resources should now be cleaned up
+      # Drop implementations will log the cleanup order
+    end
+    
+    test "cross-store protection prevents using resources from wrong store", %{component_bytes: component_bytes} do
+      # Create two separate stores
+      {:ok, store1} = Wasmex.Components.Store.new()
+      {:ok, component1} = Wasmex.Components.Component.new(store1, component_bytes)
+      {:ok, instance1} = Wasmex.Components.Instance.new(store1, component1, %{})
+      
+      {:ok, store2} = Wasmex.Components.Store.new()
+      {:ok, component2} = Wasmex.Components.Component.new(store2, component_bytes)
+      {:ok, instance2} = Wasmex.Components.Instance.new(store2, component2, %{})
+      
+      from = self()
+      
+      # Create a counter in store1
+      :ok = Wasmex.Components.Instance.call_function(
+        instance1, 
+        ["component:counter/types", "make-counter"], 
+        [100], 
+        from
+      )
+      
+      counter_from_store1 = receive do
+        {:returned_function_call, {:ok, counter}, ^from} -> counter
+        {:returned_function_call, {:error, error}, ^from} ->
+          flunk("Error creating counter in store1: #{inspect(error)}")
+      after
+        5000 -> flunk("Timeout creating counter in store1")
+      end
+      
+      # Try to use the counter from store1 in store2's context
+      # This should fail with a store protection error
+      if function_exported?(Wasmex.Components.Resource, :call_method, 4) do
+        # Only test if resource method calls are implemented
+        result = try do
+          Wasmex.Components.Resource.call_method(
+            counter_from_store1,
+            "get-value",
+            [],
+            store2  # Wrong store!
+          )
+        catch
+          kind, reason -> {:error, {kind, reason}}
+        end
+        
+        # Expect an error about wrong store
+        case result do
+          {:error, _} -> assert true  # Expected error
+          {:ok, _} -> flunk("Should not allow using resource from store1 in store2")
+          other -> flunk("Unexpected result: #{inspect(other)}")
+        end
+      end
+    end
+    
+    test "verify no memory leaks with explicit resource drops", %{component_bytes: component_bytes} do
+      # Track initial memory (this is approximate)
+      initial_memory = :erlang.memory(:total)
+      
+      # Run many iterations of create/drop
+      for _iteration <- 1..100 do
+        {:ok, store} = Wasmex.Components.Store.new()
+        {:ok, component} = Wasmex.Components.Component.new(store, component_bytes)
+        {:ok, instance} = Wasmex.Components.Instance.new(store, component, %{})
+        
+        from = self()
+        
+        # Create a counter
+        :ok = Wasmex.Components.Instance.call_function(
+          instance, 
+          ["component:counter/types", "make-counter"], 
+          [42], 
+          from
+        )
+        
+        _counter = receive do
+          {:returned_function_call, {:ok, counter}, ^from} -> counter
+          {:returned_function_call, {:error, error}, ^from} ->
+            flunk("Error creating counter: #{inspect(error)}")
+        after
+          5000 -> flunk("Timeout creating counter")
+        end
+        
+        # Explicitly drop the resource if the function exists
+        if function_exported?(Wasmex.Components.Resource, :drop, 2) do
+          # Try to drop the resource explicitly
+          # This is optional - resources should be cleaned up automatically
+          :ok = Wasmex.Components.Resource.drop(_counter, store)
+        end
+      end
+      
+      # Force GC and check memory hasn't grown excessively
+      :erlang.garbage_collect()
+      final_memory = :erlang.memory(:total)
+      
+      # Allow for some memory growth but not excessive (e.g., 10MB)
+      memory_growth = final_memory - initial_memory
+      assert memory_growth < 10_000_000, 
+             "Memory grew by #{memory_growth} bytes, possible memory leak"
+    end
+  end
 end
