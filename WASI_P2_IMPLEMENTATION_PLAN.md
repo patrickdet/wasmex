@@ -1,37 +1,40 @@
 # WASI Preview 2 Implementation Plan
 
+**Last Updated**: 2025-08-25  
+**Status**: Phase 1 COMPLETE - Resource method dispatch working!
+
 ## Current Status
 ✅ Core resource infrastructure implemented
 ✅ Resource wrapping and store tracking working  
 ✅ Basic WASI P2 runtime linked
-⚠️ Resource method dispatch not functional
+✅ **Resource method dispatch WORKING** (Completed 2025-08-25)
 🔴 Host-defined resources not implemented
 
 ## Implementation Priority
 
-### Phase 1: Critical - Resource Method Dispatch (IMMEDIATE)
+### Phase 1: Critical - Resource Method Dispatch ✅ COMPLETED
 **Goal**: Enable calling methods on resources
 
-#### Tasks:
-1. **Uncomment and fix resource NIFs** in `native/wasmex/src/resource_methods.rs`
-   - `resource_call_method` - Call methods on existing resources
-   - `resource_new` - Constructor calls for resources
+#### Tasks Completed:
+1. ✅ **Fixed resource NIFs** in `native/wasmex/src/resource_methods.rs`
+   - ✅ `resource_call_method` - Call methods on existing resources
+   - ⏸️ `resource_new` - Constructor calls (deferred - using regular function calls)
    
-2. **Implement method dispatch logic**
-   - Map method names to wasmtime resource methods
-   - Handle owned vs borrowed semantics
-   - Convert parameters and return values
+2. ✅ **Implemented method dispatch logic**
+   - ✅ Map method names to wasmtime resource methods
+   - ✅ Handle owned vs borrowed semantics
+   - ✅ Convert parameters and return values
 
-3. **Update lib.rs exports**
-   - Add NIFs to export list
-   - Ensure proper scheduling (DirtyCpu)
+3. ✅ **Updated exports**
+   - ✅ Added NIF to lib/wasmex/native.ex
+   - ✅ Proper async scheduling (DirtyCpu)
 
-4. **Write comprehensive tests**
-   - Test counter increment/get-value/reset methods
-   - Test constructor calls
-   - Test error cases (wrong store, invalid method)
+4. ✅ **Comprehensive tests written**
+   - ✅ Test counter increment/get-value/reset methods
+   - ✅ Test parameter passing
+   - ✅ Test error cases (wrong store protection)
 
-### Phase 2: Important - Resource Lifecycle Management
+### Phase 2: Important - Resource Lifecycle Management 🚧 NEXT
 **Goal**: Prevent memory leaks
 
 #### Tasks:
@@ -130,7 +133,7 @@
 
 ## Success Criteria
 
-1. **Phase 1 Complete**: Can call methods on counter resource
+1. **Phase 1 Complete**: ✅ Can call methods on counter resource (DONE!)
 2. **Phase 2 Complete**: No memory leaks in 1000x create/destroy cycles
 3. **Phase 3 Complete**: Can read/write files via resources
 4. **Phase 4 Complete**: Can establish TCP connections
@@ -181,10 +184,10 @@ cd test/component_fixtures/counter-component && cargo component build --release
 | Security issues | Store isolation validation |
 
 ## Timeline Estimate
-- Phase 1: 2-3 hours (critical path)
+- Phase 1: ✅ COMPLETED (took ~3 hours)
 - Phase 2: 1-2 hours  
 - Phase 3: 2-3 hours
 - Phase 4: 2-3 hours
 - Phase 5: 3-4 hours
 
-Total: ~13 hours of implementation + testing
+Remaining: ~10 hours of implementation + testing
