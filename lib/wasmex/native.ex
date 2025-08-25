@@ -103,6 +103,8 @@ defmodule Wasmex.Native do
   def wat_to_wasm(_wat), do: error()
 
   def resource_drop(_resource, _store), do: error()
+  
+  def resource_call_method(_store, _instance, _resource, _interface_path, _method_name, _params, _from), do: error()
 
   # When the NIF is loaded, it will override functions in this module.
   # Calling error is handles the case when the nif could not be loaded.
