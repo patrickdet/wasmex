@@ -2,9 +2,11 @@ use crate::{
     caller::{get_caller, get_caller_mut},
     engine::{unwrap_engine, EngineResource},
     pipe::{Pipe, PipeResource},
+    resource_registry::ResourceRegistry,
 };
 use rustler::{Error, NifStruct, ResourceArc};
 use std::{collections::HashMap, sync::Mutex};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use wasi_common::sync::WasiCtxBuilder;
 use wasmtime::{
     AsContext, AsContextMut, Engine, Store, StoreContext, StoreContextMut, StoreLimits,
@@ -13,6 +15,9 @@ use wasmtime::{
 use wasmtime_wasi::p2::{IoView, WasiCtx, WasiView};
 use wasmtime_wasi::ResourceTable;
 use wasmtime_wasi_http::{WasiHttpCtx, WasiHttpView};
+
+// Global store ID counter
+static STORE_ID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
 #[derive(Debug, NifStruct)]
 #[module = "Wasmex.Wasi.PreopenOptions"]
@@ -107,6 +112,8 @@ pub struct ComponentStoreData {
     pub(crate) http: Option<WasiHttpCtx>,
     pub(crate) limits: StoreLimits,
     pub(crate) table: ResourceTable,
+    pub(crate) resource_registry: ResourceRegistry,
+    pub(crate) store_id: usize,
 }
 
 impl IoView for ComponentStoreData {
@@ -212,6 +219,7 @@ pub fn component_store_new(
     } else {
         StoreLimits::default()
     };
+    let store_id = STORE_ID_COUNTER.fetch_add(1, Ordering::SeqCst);
     let mut store = Store::new(
         &engine,
         ComponentStoreData {
@@ -219,6 +227,8 @@ pub fn component_store_new(
             ctx: None,
             limits,
             table: wasmtime_wasi::ResourceTable::new(),
+            resource_registry: ResourceRegistry::new(store_id),
+            store_id,
         },
     );
     store.limiter(|state| &mut state.limits);
@@ -273,6 +283,7 @@ pub fn component_store_new_wasi(
         None
     };
 
+    let store_id = STORE_ID_COUNTER.fetch_add(1, Ordering::SeqCst);
     let mut store = Store::new(
         &engine,
         ComponentStoreData {
@@ -280,6 +291,8 @@ pub fn component_store_new_wasi(
             limits,
             http: http_option,
             table: wasmtime_wasi::ResourceTable::new(),
+            resource_registry: ResourceRegistry::new(store_id),
+            store_id,
         },
     );
     store.limiter(|state| &mut state.limits);

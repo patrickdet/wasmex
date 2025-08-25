@@ -24,7 +24,7 @@ defmodule Wasmex.Native do
       x86_64-unknown-linux-gnu
       x86_64-unknown-linux-musl
     ),
-    force_build: System.get_env("WASMEX_BUILD") in ["1", "true"]
+    force_build: true
 
   def engine_new(_engine_config), do: error()
   def engine_precompile_module(_engine_resource, _bytes), do: error()
@@ -101,6 +101,8 @@ defmodule Wasmex.Native do
   def wit_exported_functions(_path, _wit), do: error()
 
   def wat_to_wasm(_wat), do: error()
+
+  def resource_drop(_resource, _store), do: error()
 
   # When the NIF is loaded, it will override functions in this module.
   # Calling error is handles the case when the nif could not be loaded.

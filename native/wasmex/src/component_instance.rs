@@ -27,7 +27,7 @@ use wasmtime_wasi;
 use wasmtime_wasi_http;
 
 use crate::component_type_conversion::{
-    convert_params, convert_result_term, encode_result, vals_to_terms,
+    convert_params, convert_result_term, encode_result_with_store, vals_to_terms_with_store,
 };
 
 pub struct ComponentCallbackToken {
@@ -135,7 +135,8 @@ fn call_elixir_import(
     let callback_token = create_callback_token(name.clone(), namespace.clone());
 
     let _ = msg_env.send_and_clear(&pid, |env| {
-        let param_terms = vals_to_terms(params, env);
+        // TODO: Get store_id from context - using 0 for now
+        let param_terms = vals_to_terms_with_store(params, env, 0);
         (
             atoms::invoke_callback(),
             namespace,
@@ -336,7 +337,8 @@ fn component_execute_function(
     ) {
         Ok(_) => {
             let _ = function.post_return(&mut *component_store);
-            encode_result(&thread_env, result, from)
+            let store_id = component_store.data().store_id;
+            encode_result_with_store(&thread_env, result, from, store_id)
         }
         Err(err) => {
             let reason = format!("{err}");
