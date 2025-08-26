@@ -5,14 +5,6 @@ defmodule Wasmex.Components.ResourceManager do
   This module provides the bridge between Elixir resources
   (using ResourceBehaviour and ResourceServer) and WASM components.
 
-  ## Key Features
-
-  - Resources run as individual processes
-  - Automatic cleanup via process monitoring
-  - No manual drop() needed
-  - Better fault isolation
-  - Natural supervision tree integration
-
   ## Usage
 
       # Define a resource module that implements ResourceBehaviour
@@ -20,17 +12,17 @@ defmodule Wasmex.Components.ResourceManager do
         @behaviour Wasmex.Components.ResourceBehaviour
         # ... implementation
       end
-      
+
       # Create a resource
       {:ok, handle} = ResourceManager.create_resource(
         store,
         MyApp.DatabaseResource,
         "production_db"
       )
-      
+
       # Pass the handle to a WASM function
       Wasmex.Components.Instance.call_function(instance, "process-data", [handle], from)
-      
+
       # Resource automatically cleans up when its process terminates
   """
 
