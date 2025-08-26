@@ -15,7 +15,7 @@ else
     # Create component with reactor adapter (for library)
     wasm-tools component new \
         target/wasm32-wasip2/release/wasi_test_component.wasm \
-        --adapt wasi_snapshot_preview1=wasi_snapshot_preview1.reactor.wasm \
+        --adapt wasi_snapshot_preview1=../wasi_snapshot_preview1.reactor.wasm \
         -o target/wasm32-wasip2/release/wasi_test_component_final.wasm
 fi
 
