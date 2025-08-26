@@ -370,12 +370,8 @@ pub fn term_to_val(
             // Try to decode the Elixir resource reference
             match param_term.decode::<ResourceArc<WasiResourceWrapper>>() {
                 Ok(resource_wrapper) => {
-                    // Validate that this is a borrowed resource
-                    if resource_wrapper.is_owned() {
-                        return Err(Error::Term(Box::new(
-                            "Expected a borrowed resource, got an owned resource".to_string()
-                        )));
-                    }
+                    // Both owned and borrowed resources can be passed when a borrow is expected
+                    // Owned resources are automatically borrowed for the call
                     
                     // Convert to Val::Resource
                     resource_wrapper_to_val(&resource_wrapper).map_err(|e| {

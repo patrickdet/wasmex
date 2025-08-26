@@ -6,6 +6,7 @@ mod component_type_conversion;
 pub mod engine;
 pub mod environment;
 pub mod functions;
+pub mod host_resource;
 pub mod instance;
 pub mod memory;
 pub mod module;
