@@ -13,7 +13,8 @@ defmodule Wasmex.MixProject do
       name: "wasmex",
       description: description(),
       package: package(),
-      deps: deps()
+      deps: deps(),
+      aliases: aliases()
     ]
   end
 
@@ -41,6 +42,12 @@ defmodule Wasmex.MixProject do
   # Specifies which paths to compile per environment.
   defp elixirc_paths(:test), do: ["lib", "test/component_fixtures"]
   defp elixirc_paths(_), do: ["lib"]
+
+  defp aliases do
+    [
+      test: ["wasmex.build_fixtures", "test"]
+    ]
+  end
 
   defp package() do
     [
