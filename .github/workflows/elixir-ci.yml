@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - '**'  # Run on all branches
 
 env:
   ELIXIR_VERSION: 1.17.3
