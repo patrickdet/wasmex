@@ -8,7 +8,7 @@ defmodule Wasmex.Components.WasiInterfaceTest do
     test "enables filesystem access by default" do
       wasi_opts = %WasiP2Options{}
       assert {:ok, store} = Store.new_wasi(wasi_opts)
-      
+
       # Filesystem should be available (default: true)
       # We can't directly test filesystem operations without a WASM component
       # but we can verify the store was created with the config
@@ -19,6 +19,7 @@ defmodule Wasmex.Components.WasiInterfaceTest do
       wasi_opts = %WasiP2Options{
         allow_filesystem: true
       }
+
       assert {:ok, store} = Store.new_wasi(wasi_opts)
       assert store.resource
     end
@@ -27,18 +28,19 @@ defmodule Wasmex.Components.WasiInterfaceTest do
       wasi_opts = %WasiP2Options{
         allow_filesystem: false
       }
+
       assert {:ok, store} = Store.new_wasi(wasi_opts)
       assert store.resource
     end
 
     test "preopens directories for filesystem access" do
       temp_dir = System.tmp_dir!()
-      
+
       wasi_opts = %WasiP2Options{
         allow_filesystem: true,
         preopen_dirs: [temp_dir, "/tmp"]
       }
-      
+
       assert {:ok, store} = Store.new_wasi(wasi_opts)
       assert store.resource
     end
@@ -48,14 +50,15 @@ defmodule Wasmex.Components.WasiInterfaceTest do
         allow_filesystem: true,
         preopen_dirs: ["/nonexistent/directory/path"]
       }
-      
+
       # Should either succeed or return a clear error
       result = Store.new_wasi(wasi_opts)
-      
+
       case result do
-        {:ok, store} -> 
+        {:ok, store} ->
           assert store.resource
-        {:error, reason} -> 
+
+        {:error, reason} ->
           assert reason =~ "preopen"
       end
     end
@@ -66,6 +69,7 @@ defmodule Wasmex.Components.WasiInterfaceTest do
       wasi_opts = %WasiP2Options{
         allow_http: false
       }
+
       assert {:ok, store} = Store.new_wasi(wasi_opts)
       assert store.resource
     end
@@ -74,6 +78,7 @@ defmodule Wasmex.Components.WasiInterfaceTest do
       wasi_opts = %WasiP2Options{
         allow_http: true
       }
+
       assert {:ok, store} = Store.new_wasi(wasi_opts)
       assert store.resource
     end
@@ -83,6 +88,7 @@ defmodule Wasmex.Components.WasiInterfaceTest do
         allow_network: true,
         allow_http: false
       }
+
       assert {:ok, store} = Store.new_wasi(wasi_opts)
       assert store.resource
     end
@@ -92,6 +98,7 @@ defmodule Wasmex.Components.WasiInterfaceTest do
         allow_network: false,
         allow_http: false
       }
+
       assert {:ok, store} = Store.new_wasi(wasi_opts)
       assert store.resource
     end
@@ -99,8 +106,10 @@ defmodule Wasmex.Components.WasiInterfaceTest do
     test "allow_http overrides allow_network when both specified" do
       wasi_opts = %WasiP2Options{
         allow_network: false,
-        allow_http: true  # This should enable network
+        # This should enable network
+        allow_http: true
       }
+
       assert {:ok, store} = Store.new_wasi(wasi_opts)
       assert store.resource
     end
@@ -112,7 +121,7 @@ defmodule Wasmex.Components.WasiInterfaceTest do
       assert {:ok, store} = Store.new_wasi(wasi_opts)
       # Verify store is created with WASI support
       assert store != nil
-      
+
       # Default values should be true
       assert wasi_opts.inherit_stdin == true
       assert wasi_opts.inherit_stdout == true
@@ -125,6 +134,7 @@ defmodule Wasmex.Components.WasiInterfaceTest do
         inherit_stdout: true,
         inherit_stderr: false
       }
+
       assert {:ok, store} = Store.new_wasi(wasi_opts)
       assert store.resource
     end
@@ -139,6 +149,7 @@ defmodule Wasmex.Components.WasiInterfaceTest do
           "PATH" => "/usr/bin:/bin"
         }
       }
+
       assert {:ok, store} = Store.new_wasi(wasi_opts)
       assert store.resource
     end
@@ -147,6 +158,7 @@ defmodule Wasmex.Components.WasiInterfaceTest do
       wasi_opts = %WasiP2Options{
         args: ["--verbose", "--config", "/path/to/config.json"]
       }
+
       assert {:ok, store} = Store.new_wasi(wasi_opts)
       assert store.resource
     end
@@ -156,6 +168,7 @@ defmodule Wasmex.Components.WasiInterfaceTest do
         args: ["program", "--help"],
         env: %{"LANG" => "en_US.UTF-8"}
       }
+
       assert {:ok, store} = Store.new_wasi(wasi_opts)
       assert store.resource
     end
@@ -174,7 +187,7 @@ defmodule Wasmex.Components.WasiInterfaceTest do
         args: ["test"],
         env: %{"TEST" => "1"}
       }
-      
+
       assert {:ok, store} = Store.new_wasi(wasi_opts)
       assert store.resource
     end
@@ -189,11 +202,11 @@ defmodule Wasmex.Components.WasiInterfaceTest do
         allow_filesystem: true,
         preopen_dirs: [System.tmp_dir!()]
       }
-      
+
       assert {:ok, store} = Store.new_wasi(wasi_opts)
       # Verify store is created with filesystem support
       assert store != nil
-      
+
       # TODO: Load a component that uses wasi:filesystem
       # and verify it can be instantiated
     end
@@ -204,11 +217,11 @@ defmodule Wasmex.Components.WasiInterfaceTest do
       wasi_opts = %WasiP2Options{
         allow_network: true
       }
-      
+
       assert {:ok, store} = Store.new_wasi(wasi_opts)
       # Verify store is created with network support
       assert store != nil
-      
+
       # TODO: Load a component that uses wasi:sockets
       # and verify it can be instantiated
     end
@@ -217,9 +230,9 @@ defmodule Wasmex.Components.WasiInterfaceTest do
     test "clock interface is available by default" do
       # Clock should be available with basic WASI P2
       wasi_opts = %WasiP2Options{}
-      
+
       assert {:ok, _store} = Store.new_wasi(wasi_opts)
-      
+
       # TODO: Load a component that uses wasi:clocks
       # and verify it can be instantiated
     end
@@ -228,9 +241,9 @@ defmodule Wasmex.Components.WasiInterfaceTest do
     test "random interface is available by default" do
       # Random should be available with basic WASI P2
       wasi_opts = %WasiP2Options{}
-      
+
       assert {:ok, _store} = Store.new_wasi(wasi_opts)
-      
+
       # TODO: Load a component that uses wasi:random
       # and verify it can be instantiated
     end
@@ -240,11 +253,14 @@ defmodule Wasmex.Components.WasiInterfaceTest do
     test "handles invalid configuration gracefully" do
       # Test with various configurations that should work with defaults
       configs = [
-        %WasiP2Options{},                    # All defaults
-        %WasiP2Options{args: ["test"]},      # With args
-        %WasiP2Options{env: %{"A" => "B"}},  # With env
+        # All defaults
+        %WasiP2Options{},
+        # With args
+        %WasiP2Options{args: ["test"]},
+        # With env
+        %WasiP2Options{env: %{"A" => "B"}}
       ]
-      
+
       for config <- configs do
         assert {:ok, store} = Store.new_wasi(config)
         assert store.resource

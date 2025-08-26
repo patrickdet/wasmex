@@ -15,10 +15,12 @@ defmodule Wasmex.Components.ImportTest do
       "get-point" => {:fn, fn -> %{x: 1, y: 2} end},
       "get-tuple" => {:fn, fn -> {1, "foo"} end},
       # Capture printed values for verification instead of suppressing
-      "print" => {:fn, fn x -> 
-        Agent.update(print_agent, fn values -> [x | values] end)
-        :ok 
-      end},
+      "print" =>
+        {:fn,
+         fn x ->
+           Agent.update(print_agent, fn values -> [x | values] end)
+           :ok
+         end},
       "maybe-get-number" => {:fn, fn -> {:ok, 42} end}
     }
 
@@ -46,6 +48,7 @@ defmodule Wasmex.Components.ImportTest do
     # Verify print function is called with "bananas"
     assert {:ok, {:ok, "bananas"}} =
              Wasmex.Components.call_function(component_pid, "print-or-error", ["bananas"])
+
     assert Agent.get(print_agent, & &1) == ["bananas"]
 
     # Clear the agent for next test
@@ -54,6 +57,7 @@ defmodule Wasmex.Components.ImportTest do
     # Verify print function is called with "error"
     assert {:ok, {:error, "error"}} =
              Wasmex.Components.call_function(component_pid, "print-or-error", ["error"])
+
     assert Agent.get(print_agent, & &1) == ["error"]
 
     assert {:ok, {:ok, 42}} =

@@ -1,12 +1,12 @@
 defmodule Wasmex.Components.Examples.SupervisionPatterns do
   @moduledoc """
   Common supervision patterns for WASM component resources.
-  
+
   These are examples showing how to integrate ResourceServer with standard OTP supervisors.
   Users should adapt these patterns to their specific needs.
-  
+
   ## Pattern 1: Application-level Resources
-  
+
       defmodule MyApp.Application do
         use Application
         
@@ -26,9 +26,9 @@ defmodule Wasmex.Components.Examples.SupervisionPatterns do
           Supervisor.start_link(children, strategy: :one_for_one)
         end
       end
-  
+
   ## Pattern 2: Dynamic Resource Pool
-  
+
       defmodule MyApp.ResourcePool do
         def start_link do
           DynamicSupervisor.start_link(
@@ -42,9 +42,9 @@ defmodule Wasmex.Components.Examples.SupervisionPatterns do
           DynamicSupervisor.start_child(__MODULE__, spec)
         end
       end
-  
+
   ## Pattern 3: Per-Store Resources
-  
+
       defmodule MyApp.StoreManager do
         use Supervisor
         
@@ -62,9 +62,9 @@ defmodule Wasmex.Components.Examples.SupervisionPatterns do
           Supervisor.init(children, strategy: :rest_for_one)
         end
       end
-  
+
   ## Pattern 4: Resource with Health Monitoring
-  
+
       defmodule MyApp.MonitoredResource do
         use GenServer
         
@@ -101,9 +101,9 @@ defmodule Wasmex.Components.Examples.SupervisionPatterns do
           end
         end
       end
-  
+
   ## Pattern 5: Linked Resource Pairs
-  
+
       # When you need two resources that depend on each other
       defmodule MyApp.LinkedResources do
         use Supervisor
@@ -127,9 +127,9 @@ defmodule Wasmex.Components.Examples.SupervisionPatterns do
           Supervisor.init(children, strategy: :one_for_all)
         end
       end
-  
+
   ## Key Principles
-  
+
   1. **Let OTP handle lifecycle** - Don't manually manage resource processes
   2. **Choose appropriate restart strategies** - Based on resource criticality
   3. **Use standard patterns** - DynamicSupervisor, Supervisor, GenServer
