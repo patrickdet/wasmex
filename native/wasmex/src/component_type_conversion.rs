@@ -402,7 +402,6 @@ pub fn term_to_val(
 ///
 /// Used to for Wasm function calls when passing Wasm params to an Elixir function call.
 // Removed unused function val_to_term - use val_to_term_with_store directly if needed
-
 pub fn val_to_term_with_store<'a>(
     val: &Val,
     env: rustler::Env<'a>,
@@ -523,7 +522,7 @@ pub fn val_to_term_with_store<'a>(
         }
         Val::Resource(resource_any) => {
             // Convert ResourceAny to our wrapper
-            match val_to_resource_wrapper(Val::Resource(resource_any.clone()), store_id) {
+            match val_to_resource_wrapper(Val::Resource(*resource_any), store_id) {
                 Ok(wrapper) => wrapper.encode(env),
                 Err(e) => {
                     if path.is_empty() {

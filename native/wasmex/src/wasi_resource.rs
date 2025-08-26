@@ -78,8 +78,8 @@ pub fn resource_wrapper_to_val(wrapper: &ResourceArc<WasiResourceWrapper>) -> Re
     let resource = wrapper
         .inner
         .lock()
-        .map_err(|e| format!("Could not lock resource: {}", e.to_string()))?;
+        .map_err(|e| format!("Could not lock resource: {}", e))?;
 
     // Clone the ResourceAny - this is safe as it just clones the handle
-    Ok(Val::Resource(resource.clone()))
+    Ok(Val::Resource(*resource))
 }

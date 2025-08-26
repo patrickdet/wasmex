@@ -77,7 +77,7 @@ pub fn new_instance(
     wasmtime_wasi::p2::add_to_linker_sync(&mut linker).map_err(|e| {
         rustler::Error::Term(Box::new(format!(
             "Failed to add WASI P2 interfaces to linker: {}",
-            e.to_string()
+            e
         )))
     })?;
 
@@ -86,7 +86,7 @@ pub fn new_instance(
         wasmtime_wasi_http::add_only_http_to_linker_sync(&mut linker).map_err(|e| {
             rustler::Error::Term(Box::new(format!(
                 "Failed to add WASI HTTP interfaces to linker: {}",
-                e.to_string()
+                e
             )))
         })?;
     }

@@ -173,7 +173,7 @@ fn execute_resource_method(
     };
 
     // Get the resource from the wrapper
-    let resource_any = resource_wrapper.inner.lock().unwrap().clone();
+    let resource_any = *resource_wrapper.inner.lock().unwrap();
 
     // Prepare arguments: resource is the first argument, followed by method params
     let mut args = vec![Val::Resource(resource_any)];
@@ -229,7 +229,7 @@ fn execute_resource_method(
             // Convert results to Elixir terms
             // Convert results to Elixir terms
             let result_terms = vals_to_terms_with_store(results.as_slice(), env, store_id);
-            let result = if result_terms.len() == 0 {
+            let result = if result_terms.is_empty() {
                 atoms::ok().encode(env)
             } else if result_terms.len() == 1 {
                 make_tuple(env, &[atoms::ok().encode(env), result_terms[0]])

@@ -54,7 +54,7 @@ pub fn host_resource_type_register(type_name: String) -> NifResult<rustler::Atom
     let mut types = HOST_RESOURCE_TYPES.write().map_err(|e| {
         Error::Term(Box::new(format!(
             "Could not lock host resource types: {}",
-            e.to_string()
+            e
         )))
     })?;
 
@@ -73,7 +73,7 @@ pub fn host_resource_new(
     let mut store = store_resource
         .inner
         .lock()
-        .map_err(|e| Error::Term(Box::new(format!("Could not lock store: {}", e.to_string()))))?;
+        .map_err(|e| Error::Term(Box::new(format!("Could not lock store: {}", e))))?;
 
     let store_id = store.data().store_id;
 
@@ -81,7 +81,7 @@ pub fn host_resource_new(
     let types = HOST_RESOURCE_TYPES.read().map_err(|e| {
         Error::Term(Box::new(format!(
             "Could not lock host resource types: {}",
-            e.to_string()
+            e
         )))
     })?;
 
@@ -103,14 +103,14 @@ pub fn host_resource_new(
     let mut instances = HOST_RESOURCE_INSTANCES.write().map_err(|e| {
         Error::Term(Box::new(format!(
             "Could not lock host resource instances: {}",
-            e.to_string()
+            e
         )))
     })?;
 
     instances.insert(resource_id, host_instance.clone());
 
     // Create a ResourceAny that wraps our host resource
-    let resource_any = create_host_resource_any(host_instance, &mut *store)?;
+    let resource_any = create_host_resource_any(host_instance, &mut store)?;
 
     // Wrap it in our WasiResourceWrapper
     let wrapper = WasiResourceWrapper {
@@ -137,7 +137,7 @@ fn create_host_resource_any(
     let resource_any = resource.try_into_resource_any(store).map_err(|e| {
         Error::Term(Box::new(format!(
             "Failed to convert resource to ResourceAny: {}",
-            e.to_string()
+            e
         )))
     })?;
 
@@ -172,7 +172,7 @@ pub fn dispatch_host_method(
     let instances = HOST_RESOURCE_INSTANCES.read().map_err(|e| {
         Error::Term(Box::new(format!(
             "Could not lock host resource instances: {}",
-            e.to_string()
+            e
         )))
     })?;
 
@@ -316,13 +316,13 @@ pub fn convert_term_to_val<'a>(term: Term<'a>) -> NifResult<Val> {
         return Ok(Val::Float64(f));
     }
     if let Ok(s) = term.decode::<String>() {
-        return Ok(Val::String(s.into()));
+        return Ok(Val::String(s));
     }
 
     // Check for list
     if let Ok(list) = term.decode::<Vec<Term>>() {
         let vals: NifResult<Vec<Val>> = list.into_iter().map(|t| convert_term_to_val(t)).collect();
-        return Ok(Val::List(vals?.into()));
+        return Ok(Val::List(vals?));
     }
 
     // Check for Option (represented as :none or {:some, value})
@@ -358,9 +358,9 @@ pub fn convert_term_to_val<'a>(term: Term<'a>) -> NifResult<Val> {
         return Ok(Val::Record(fields));
     }
 
-    Err(Error::Term(Box::new(format!(
-        "Cannot convert Elixir term to Val: unsupported type"
-    ))))
+    Err(Error::Term(Box::new(
+        "Cannot convert Elixir term to Val: unsupported type".to_string(),
+    )))
 }
 
 /// Handle dropping a host resource
@@ -369,7 +369,7 @@ pub fn drop_host_resource(resource_id: u64) -> NifResult<()> {
     let mut instances = HOST_RESOURCE_INSTANCES.write().map_err(|e| {
         Error::Term(Box::new(format!(
             "Could not lock host resource instances: {}",
-            e.to_string()
+            e
         )))
     })?;
 
@@ -392,7 +392,7 @@ pub fn host_resource_call_method<'a>(
     let store = store_resource
         .inner
         .lock()
-        .map_err(|e| Error::Term(Box::new(format!("Could not lock store: {}", e.to_string()))))?;
+        .map_err(|e| Error::Term(Box::new(format!("Could not lock store: {}", e))))?;
 
     // Validate store ownership
     if resource.store_id != store.data().store_id {
@@ -406,12 +406,10 @@ pub fn host_resource_call_method<'a>(
     let _vals = vals?;
 
     // Get the resource from the wrapper
-    let _resource_any = resource.inner.lock().map_err(|e| {
-        Error::Term(Box::new(format!(
-            "Could not lock resource: {}",
-            e.to_string()
-        )))
-    })?;
+    let _resource_any = resource
+        .inner
+        .lock()
+        .map_err(|e| Error::Term(Box::new(format!("Could not lock resource: {}", e))))?;
 
     // Here we would dispatch the method call through wasmtime
     // For now, this is a placeholder

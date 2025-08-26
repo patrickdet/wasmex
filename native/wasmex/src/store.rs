@@ -302,8 +302,7 @@ pub fn component_store_new_wasi(
                     .map_err(|e| {
                         rustler::Error::Term(Box::new(format!(
                             "Failed to preopen directory {}: {}",
-                            dir,
-                            e.to_string()
+                            dir, e
                         )))
                     })?;
             }
