@@ -207,7 +207,7 @@ defmodule Wasmex.Components.WasiInterfaceTest do
       # Verify store is created with filesystem support
       assert store != nil
 
-      # TODO: Load a component that uses wasi:filesystem
+      # Future: Load a component that uses wasi:filesystem
       # and verify it can be instantiated
     end
 
@@ -222,7 +222,7 @@ defmodule Wasmex.Components.WasiInterfaceTest do
       # Verify store is created with network support
       assert store != nil
 
-      # TODO: Load a component that uses wasi:sockets
+      # Future: Load a component that uses wasi:sockets
       # and verify it can be instantiated
     end
 
@@ -233,7 +233,7 @@ defmodule Wasmex.Components.WasiInterfaceTest do
 
       assert {:ok, _store} = Store.new_wasi(wasi_opts)
 
-      # TODO: Load a component that uses wasi:clocks
+      # Future: Load a component that uses wasi:clocks
       # and verify it can be instantiated
     end
 
@@ -244,7 +244,7 @@ defmodule Wasmex.Components.WasiInterfaceTest do
 
       assert {:ok, _store} = Store.new_wasi(wasi_opts)
 
-      # TODO: Load a component that uses wasi:random
+      # Future: Load a component that uses wasi:random
       # and verify it can be instantiated
     end
   end

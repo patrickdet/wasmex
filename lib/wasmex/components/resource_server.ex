@@ -171,9 +171,7 @@ defmodule Wasmex.Components.ResourceServer do
     # Validate the module implements the behaviour by checking if it's in the behaviours list
     behaviours = module.module_info(:attributes)[:behaviour] || []
 
-    unless Wasmex.Components.ResourceBehaviour in behaviours do
-      {:stop, {:error, "Module #{module} does not implement ResourceBehaviour"}}
-    else
+    if Wasmex.Components.ResourceBehaviour in behaviours do
       # Store the type name for quick access
       type_name = module.type_name()
 
@@ -191,6 +189,8 @@ defmodule Wasmex.Components.ResourceServer do
         {:error, reason} ->
           {:stop, {:error, reason}}
       end
+    else
+      {:stop, {:error, "Module #{module} does not implement ResourceBehaviour"}}
     end
   end
 

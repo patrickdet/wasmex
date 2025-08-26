@@ -41,6 +41,7 @@ defmodule Wasmex.Components.ResourceManager do
   @type resource_handle :: reference()
 
   defmodule State do
+    @moduledoc false
     defstruct [
       # Map of resource_id -> {pid, store_id}
       :resources,
@@ -173,60 +174,20 @@ defmodule Wasmex.Components.ResourceManager do
     # Validate the module implements the behaviour
     behaviours = module.module_info(:attributes)[:behaviour] || []
 
-    unless Wasmex.Components.ResourceBehaviour in behaviours do
-      {:reply, {:error, "Module does not implement ResourceBehaviour"}, state}
-    else
+    if Wasmex.Components.ResourceBehaviour in behaviours do
       # Get the store ID
       store_id = get_store_id(store)
 
       # Start the resource process
       case Wasmex.Components.ResourceServer.start_link(module, args, opts) do
         {:ok, pid} ->
-          # Get the type name
-          {:ok, type_name} = Wasmex.Components.ResourceServer.get_type_name(pid)
-
-          # Allocate a resource ID
-          resource_id = state.next_id
-
-          # Monitor the process for automatic cleanup
-          monitor_ref = Process.monitor(pid)
-
-          # Create the native resource handle via NIF
-          case create_native_handle(store, resource_id, type_name) do
-            {:ok, handle} ->
-              # Update state
-              resources = Map.put(state.resources, resource_id, {pid, store_id})
-
-              store_resources =
-                Map.update(state.store_resources, store_id, MapSet.new([resource_id]), fn set ->
-                  MapSet.put(set, resource_id)
-                end)
-
-              monitors = Map.put(state.monitors, monitor_ref, resource_id)
-
-              new_state = %State{
-                state
-                | resources: resources,
-                  next_id: resource_id + 1,
-                  store_resources: store_resources,
-                  monitors: monitors
-              }
-
-              Logger.debug(
-                "Created process resource #{resource_id} (pid: #{inspect(pid)}) of type #{type_name} for store #{store_id}"
-              )
-
-              {:reply, {:ok, handle}, new_state}
-
-            {:error, reason} ->
-              # Stop the process if native handle creation failed
-              Wasmex.Components.ResourceServer.stop(pid)
-              {:reply, {:error, reason}, state}
-          end
+          handle_resource_process_started(pid, store, store_id, state)
 
         {:error, reason} ->
           {:reply, {:error, "Failed to start resource process: #{inspect(reason)}"}, state}
       end
+    else
+      {:reply, {:error, "Module does not implement ResourceBehaviour"}, state}
     end
   end
 
@@ -316,13 +277,7 @@ defmodule Wasmex.Components.ResourceManager do
         monitors = Map.delete(state.monitors, monitor_ref)
 
         store_resources =
-          if store_id do
-            Map.update(state.store_resources, store_id, MapSet.new(), fn set ->
-              MapSet.delete(set, resource_id)
-            end)
-          else
-            state.store_resources
-          end
+          remove_from_store_resources(state.store_resources, store_id, resource_id)
 
         new_state = %State{
           state
@@ -358,6 +313,64 @@ defmodule Wasmex.Components.ResourceManager do
       end
     rescue
       e -> {:error, "NIF not yet implemented for process-based resources: #{inspect(e)}"}
+    end
+  end
+
+  defp update_store_resources(store_resources, store_id, resource_id) do
+    Map.update(store_resources, store_id, MapSet.new([resource_id]), fn set ->
+      MapSet.put(set, resource_id)
+    end)
+  end
+
+  defp remove_from_store_resources(store_resources, nil, _resource_id) do
+    store_resources
+  end
+
+  defp remove_from_store_resources(store_resources, store_id, resource_id) do
+    Map.update(store_resources, store_id, MapSet.new(), fn set ->
+      MapSet.delete(set, resource_id)
+    end)
+  end
+
+  defp handle_resource_process_started(pid, store, store_id, state) do
+    # Get the type name
+    {:ok, type_name} = Wasmex.Components.ResourceServer.get_type_name(pid)
+
+    # Allocate a resource ID
+    resource_id = state.next_id
+
+    # Monitor the process for automatic cleanup
+    monitor_ref = Process.monitor(pid)
+
+    # Create the native resource handle via NIF
+    case create_native_handle(store, resource_id, type_name) do
+      {:ok, handle} ->
+        # Update state
+        resources = Map.put(state.resources, resource_id, {pid, store_id})
+
+        store_resources =
+          update_store_resources(state.store_resources, store_id, resource_id)
+
+        monitors = Map.put(state.monitors, monitor_ref, resource_id)
+
+        new_state = %State{
+          state
+          | resources: resources,
+            next_id: resource_id + 1,
+            store_resources: store_resources,
+            monitors: monitors
+        }
+
+        Logger.debug(
+          "Created process resource #{resource_id} (pid: #{inspect(pid)}) of type #{type_name} for store #{store_id}"
+        )
+
+        {:reply, {:ok, handle}, new_state}
+
+      {:error, reason} ->
+        # Stop the process if native handle creation failed
+        Wasmex.Components.ResourceServer.stop(pid)
+        {:reply, {:error, reason}, state}
     end
   end
 end
