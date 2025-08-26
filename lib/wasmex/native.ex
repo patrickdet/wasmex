@@ -102,8 +102,6 @@ defmodule Wasmex.Native do
 
   def wat_to_wasm(_wat), do: error()
 
-  def resource_drop(_resource, _store), do: error()
-
   def resource_call_method(
         _store,
         _instance,

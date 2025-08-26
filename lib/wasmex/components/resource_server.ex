@@ -2,20 +2,14 @@ defmodule Wasmex.Components.ResourceServer do
   @moduledoc """
   GenServer that runs individual host-defined resources as processes.
 
-  Each resource runs in its own process, providing:
-  - Automatic cleanup on process termination (no manual drop needed)
-  - Crash isolation between resources
-  - Natural state management via GenServer
-  - Seamless OTP supervision tree integration
-
   ## Basic Usage
 
       # Start a resource
       {:ok, pid} = ResourceServer.start_link(MyApp.DatabaseResource, "production_db")
-      
+
       # Call methods on the resource
       {:ok, result} = ResourceServer.call_method(pid, "query", ["SELECT * FROM users"])
-      
+
       # Resource automatically cleans up when process terminates
       ResourceServer.stop(pid)  # or let supervision tree handle it
 
@@ -29,17 +23,17 @@ defmodule Wasmex.Components.ResourceServer do
 
       defmodule MyApp.Application do
         use Application
-        
+
         def start(_type, _args) do
           children = [
             # Your other application children...
-            
+
             # Supervised resources with different restart strategies
             {ResourceServer, {DatabaseResource, "prod"}, restart: :permanent},
             {ResourceServer, {CacheResource, %{ttl: 3600}}, restart: :transient},
             {ResourceServer, {TempFileResource, "/tmp/upload"}, restart: :temporary}
           ]
-          
+
           Supervisor.start_link(children, strategy: :one_for_one, name: MyApp.Supervisor)
         end
       end
@@ -52,7 +46,7 @@ defmodule Wasmex.Components.ResourceServer do
       children = [
         {DynamicSupervisor, name: MyApp.ResourceSupervisor, strategy: :one_for_one}
       ]
-      
+
       # Later, create resources dynamically
       DynamicSupervisor.start_child(
         MyApp.ResourceSupervisor,

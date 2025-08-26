@@ -1,4 +1,4 @@
-use rustler::{Error, NifResult, ResourceArc};
+use rustler::ResourceArc;
 use std::sync::Mutex;
 use wasmtime::component::{ResourceAny, Val};
 
@@ -34,47 +34,10 @@ impl Drop for WasiResourceWrapper {
     }
 }
 
-#[rustler::nif(name = "resource_drop")]
-pub fn resource_drop(
-    resource: ResourceArc<WasiResourceWrapper>,
-    store_resource: ResourceArc<crate::store::ComponentStoreResource>,
-) -> NifResult<rustler::Atom> {
-    let mut store = store_resource.inner.lock().map_err(|e| {
-        Error::Term(Box::new(format!(
-            "Could not lock store: {}",
-            e.to_string()
-        )))
-    })?;
-
-    // Validate that the resource belongs to this store
-    if resource.store_id != store.data().store_id {
-        return Err(Error::Term(Box::new(
-            "Resource does not belong to this store".to_string()
-        )));
-    }
-
-    let resource_any = resource.inner.lock().map_err(|e| {
-        Error::Term(Box::new(format!(
-            "Could not lock resource: {}",
-            e.to_string()
-        )))
-    })?;
-
-    // Drop the resource in the store context
-    resource_any.resource_drop(&mut *store).map_err(|e| {
-        Error::Term(Box::new(format!(
-            "Failed to drop resource: {}",
-            e.to_string()
-        )))
-    })?;
-
-    Ok(crate::atoms::ok())
-}
-
 impl WasiResourceWrapper {
     pub fn new(resource: ResourceAny, store_id: usize) -> Self {
         let is_owned = resource.owned();
-        
+
         // Determine resource type based on whether it's host or guest
         // For now, we'll default to guest-defined until we can properly detect
         let resource_type = ResourceType::GuestDefined {
@@ -111,13 +74,12 @@ pub fn val_to_resource_wrapper(
     }
 }
 
-pub fn resource_wrapper_to_val(
-    wrapper: &ResourceArc<WasiResourceWrapper>,
-) -> Result<Val, String> {
-    let resource = wrapper.inner.lock().map_err(|e| {
-        format!("Could not lock resource: {}", e.to_string())
-    })?;
-    
+pub fn resource_wrapper_to_val(wrapper: &ResourceArc<WasiResourceWrapper>) -> Result<Val, String> {
+    let resource = wrapper
+        .inner
+        .lock()
+        .map_err(|e| format!("Could not lock resource: {}", e.to_string()))?;
+
     // Clone the ResourceAny - this is safe as it just clones the handle
     Ok(Val::Resource(resource.clone()))
 }

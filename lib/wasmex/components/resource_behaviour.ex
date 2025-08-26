@@ -2,20 +2,17 @@ defmodule Wasmex.Components.ResourceBehaviour do
   @moduledoc """
   Behaviour for implementing host-defined resources that run as processes.
 
-  This provides a more idiomatic Elixir approach where each resource is a process
-  with automatic cleanup on termination, eliminating the need for manual drop() calls.
-
   ## Quick Example
 
       defmodule MyCounter do
         @behaviour Wasmex.Components.ResourceBehaviour
-        
+
         @impl true
         def type_name, do: "counter"
-        
+
         @impl true
         def init(initial_value), do: {:ok, initial_value}
-        
+
         @impl true
         def handle_method("increment", [], count), do: {:reply, count + 1, count + 1}
         def handle_method("get", [], count), do: {:reply, count, count}
@@ -31,12 +28,12 @@ defmodule Wasmex.Components.ResourceBehaviour do
 
       defmodule MyApp.DatabaseResource do
         @behaviour Wasmex.Components.ResourceBehaviour
-        
+
         defstruct [:conn, :query_count]
-        
+
         @impl true
         def type_name, do: "database-connection"
-        
+
         @impl true
         def init(database_name) do
           case MyApp.Database.connect(database_name) do
@@ -46,14 +43,14 @@ defmodule Wasmex.Components.ResourceBehaviour do
               {:error, reason}
           end
         end
-        
+
         @impl true
         def handle_method("query", [sql], state) do
           result = MyApp.Database.query(state.conn, sql)
           new_state = %{state | query_count: state.query_count + 1}
           {:reply, result, new_state}
         end
-        
+
         @impl true
         def handle_method("get-stats", [], state) do
           stats = %{
@@ -62,12 +59,12 @@ defmodule Wasmex.Components.ResourceBehaviour do
           }
           {:reply, stats, state}
         end
-        
+
         @impl true
         def handle_method(method, _params, state) do
           {:error, "Unknown method: \#{method}", state}
         end
-        
+
         @impl true
         def terminate(_reason, state) do
           MyApp.Database.close(state.conn)
@@ -79,8 +76,7 @@ defmodule Wasmex.Components.ResourceBehaviour do
 
   Resources are started as GenServer processes. When the process terminates
   (either normally or due to error), the `terminate/2` callback is called
-  for cleanup. This ensures resources are always properly cleaned up without
-  requiring manual drop() calls.
+  for cleanup.
 
   ## Supervision Patterns
 
@@ -91,7 +87,7 @@ defmodule Wasmex.Components.ResourceBehaviour do
         {ResourceServer, {MyResource, "config"}}
       ]
       Supervisor.start_link(children, strategy: :one_for_one)
-      
+
       # With restart configuration
       Supervisor.child_spec(
         {ResourceServer, {MyResource, args}},
@@ -100,7 +96,7 @@ defmodule Wasmex.Components.ResourceBehaviour do
 
   Choose restart strategies based on resource characteristics:
   - Critical resources (DB connections): `:permanent`
-  - Normal resources: `:transient` 
+  - Normal resources: `:transient`
   - Ephemeral resources (temp files): `:temporary`
   """
 
@@ -138,7 +134,7 @@ defmodule Wasmex.Components.ResourceBehaviour do
   ## Parameters
 
   - `method` - The method name as a string
-  - `params` - List of parameters from the WASM component  
+  - `params` - List of parameters from the WASM component
   - `state` - The current resource state
 
   ## Return Values
@@ -160,9 +156,6 @@ defmodule Wasmex.Components.ResourceBehaviour do
   - Close any open connections
   - Release any held resources
   - Perform final cleanup
-
-  This function is guaranteed to be called when the process terminates,
-  providing automatic cleanup without manual drop() calls.
 
   ## Parameters
 

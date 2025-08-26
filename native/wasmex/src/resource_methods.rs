@@ -1,12 +1,11 @@
 use rustler::{Encoder, Env, OwnedEnv, ResourceArc, Term};
 use std::thread;
 use wasmtime::component::Val;
-use wasmtime::Store;
 
 use crate::atoms;
 use crate::component_instance::ComponentInstanceResource;
 use crate::component_type_conversion::{convert_params, vals_to_terms_with_store};
-use crate::store::{ComponentStoreData, ComponentStoreResource};
+use crate::store::ComponentStoreResource;
 use crate::wasi_resource::WasiResourceWrapper;
 use rustler::env::SavedTerm;
 use rustler::types::tuple::make_tuple;
@@ -28,7 +27,7 @@ pub fn resource_call_method<'a>(
     let mut thread_env = OwnedEnv::new();
     let saved_params = thread_env.save(params);
     let saved_from = thread_env.save(from);
-    
+
     thread::spawn(move || {
         thread_env.send_and_clear(&pid, |thread_env| {
             execute_resource_method(
@@ -43,7 +42,7 @@ pub fn resource_call_method<'a>(
             )
         })
     });
-    
+
     atoms::ok().encode(env)
 }
 
@@ -57,14 +56,15 @@ fn execute_resource_method(
     saved_params: SavedTerm,
     saved_from: SavedTerm,
 ) -> Term {
-    let from = saved_from.load(env).decode::<Term>().unwrap_or_else(|_| {
-        "could not load 'from' param".encode(env)
-    });
-    
+    let from = saved_from
+        .load(env)
+        .decode::<Term>()
+        .unwrap_or_else(|_| "could not load 'from' param".encode(env));
+
     // Validate that the resource belongs to this store
     let mut store = store_resource.inner.lock().unwrap();
     let store_id = store.data().store_id;
-    
+
     if resource_wrapper.store_id != store_id {
         let error_msg = "Resource does not belong to this store".to_string();
         let error_tuple = env.error_tuple(error_msg);
@@ -77,7 +77,7 @@ fn execute_resource_method(
             ],
         );
     }
-    
+
     // Load the params
     let params = match saved_params.load(env).decode::<Vec<Term>>() {
         Ok(p) => p,
@@ -94,10 +94,10 @@ fn execute_resource_method(
             );
         }
     };
-    
+
     // Get the instance
     let instance = instance_resource.inner.lock().unwrap();
-    
+
     // Build the full method path (e.g., ["component:counter/types", "[method]counter.increment"])
     let mut method_path = interface_path.clone();
     // Resource methods in wasmtime components are exported with special naming:
@@ -106,7 +106,7 @@ fn execute_resource_method(
     // For now, we'll use a simplified approach
     // Note: method names use hyphens, not underscores (e.g., "get-value" not "get_value")
     method_path.push(format!("[method]counter.{}", method_name));
-    
+
     // Look up the method function
     let mut lookup_index = None;
     for (index, name) in method_path.iter().enumerate() {
@@ -119,7 +119,7 @@ fn execute_resource_method(
                 .get_export(&mut *store, None, name.as_str())
                 .map(|(_, index)| index);
         }
-        
+
         if lookup_index.is_none() {
             let error_msg = format!(
                 "Resource method '{}' not found at position {} in path [{}]",
@@ -138,14 +138,11 @@ fn execute_resource_method(
             );
         }
     }
-    
+
     let lookup_index = match lookup_index {
         Some(index) => index,
         None => {
-            let error_msg = format!(
-                "Resource method not found: [{}]",
-                method_path.join(", ")
-            );
+            let error_msg = format!("Resource method not found: [{}]", method_path.join(", "));
             let error_tuple = env.error_tuple(error_msg);
             return make_tuple(
                 env,
@@ -157,12 +154,12 @@ fn execute_resource_method(
             );
         }
     };
-    
+
     // Get the function
     let function = match instance.get_func(&mut *store, lookup_index) {
         Some(func) => func,
         None => {
-            let error_msg = format!("Could not get function for method '{}'" , method_name);
+            let error_msg = format!("Could not get function for method '{}'", method_name);
             let error_tuple = env.error_tuple(error_msg);
             return make_tuple(
                 env,
@@ -174,13 +171,13 @@ fn execute_resource_method(
             );
         }
     };
-    
+
     // Get the resource from the wrapper
     let resource_any = resource_wrapper.inner.lock().unwrap().clone();
-    
+
     // Prepare arguments: resource is the first argument, followed by method params
     let mut args = vec![Val::Resource(resource_any)];
-    
+
     // Convert the additional parameters
     let param_types: Vec<wasmtime::component::Type> = function
         .params(&*store)
@@ -188,7 +185,7 @@ fn execute_resource_method(
         .skip(1) // Skip the resource parameter
         .map(|(_, ty)| ty.clone())
         .collect();
-    
+
     match convert_params(&param_types, params) {
         Ok(mut converted_params) => args.append(&mut converted_params),
         Err(err) => {
@@ -204,17 +201,17 @@ fn execute_resource_method(
             );
         }
     }
-    
+
     // Allocate space for results
     let result_count = function.results(&*store).len();
     let mut results = vec![Val::Bool(false); result_count];
-    
+
     // Call the method
     let store_id = store.data().store_id;
     match function.call(&mut *store, &args, &mut results) {
         Ok(_) => {
             match function.post_return(&mut *store) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(err) => {
                     let error_msg = format!("post_return error: {:?}", err);
                     let error_tuple = env.error_tuple(error_msg);
@@ -228,7 +225,7 @@ fn execute_resource_method(
                     );
                 }
             }
-            
+
             // Convert results to Elixir terms
             // Convert results to Elixir terms
             let result_terms = vals_to_terms_with_store(results.as_slice(), env, store_id);
@@ -242,11 +239,7 @@ fn execute_resource_method(
             };
             make_tuple(
                 env,
-                &[
-                    atoms::returned_function_call().encode(env),
-                    result,
-                    from,
-                ],
+                &[atoms::returned_function_call().encode(env), result, from],
             )
         }
         Err(err) => {
@@ -282,7 +275,7 @@ pub fn resource_new<'a>(
     // 5. Creating a WasiResourceWrapper
     // 6. Registering it with the store's resource registry
     // 7. Returning the wrapped resource
-    
+
     let error_msg = "Resource constructor not yet implemented".to_string();
     let error_tuple = env.error_tuple(error_msg);
     rustler::types::tuple::make_tuple(
@@ -293,25 +286,4 @@ pub fn resource_new<'a>(
             from,
         ],
     )
-}
-
-/// Drop a resource and unregister it from the registry
-pub fn drop_resource_internal(
-    store: &mut Store<ComponentStoreData>,
-    resource_wrapper: &WasiResourceWrapper,
-) -> Result<(), String> {
-    // Get the resource from the wrapper
-    let resource_any = resource_wrapper.inner.lock().map_err(|e| {
-        format!("Could not lock resource: {}", e.to_string())
-    })?;
-
-    // Drop the resource in the store context
-    resource_any.resource_drop(store).map_err(|e| {
-        format!("Failed to drop resource: {}", e.to_string())
-    })?;
-
-    // TODO: Remove from resource registry
-    // store.data().resource_registry.remove_resource(resource_id);
-
-    Ok(())
 }

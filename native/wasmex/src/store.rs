@@ -5,8 +5,8 @@ use crate::{
     resource_registry::ResourceRegistry,
 };
 use rustler::{Error, NifStruct, ResourceArc};
-use std::{collections::HashMap, sync::Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{collections::HashMap, sync::Mutex};
 use wasi_common::sync::WasiCtxBuilder;
 use wasmtime::{
     AsContext, AsContextMut, Engine, Store, StoreContext, StoreContextMut, StoreLimits,
@@ -158,14 +158,14 @@ impl Drop for ComponentStoreResource {
         if let Ok(store) = self.inner.lock() {
             let store_id = store.data().store_id;
             let resource_count = store.data().resource_registry.count_active_resources();
-            
+
             if resource_count > 0 {
                 eprintln!(
                     "Store {} being dropped with {} active resources, clearing registry",
                     store_id, resource_count
                 );
             }
-            
+
             store.data().resource_registry.clear();
         }
     }
@@ -292,15 +292,20 @@ pub fn component_store_new_wasi(
             for dir in preopen_dirs {
                 // Preopen the directory with "." as the guest path
                 // This allows the guest to access files using relative paths
-                wasi_ctx_builder.preopened_dir(
-                    dir,
-                    ".",
-                    wasmtime_wasi::DirPerms::all(),
-                    wasmtime_wasi::FilePerms::all(),
-                ).map_err(|e| rustler::Error::Term(Box::new(format!(
-                    "Failed to preopen directory {}: {}",
-                    dir, e.to_string()
-                ))))?;
+                wasi_ctx_builder
+                    .preopened_dir(
+                        dir,
+                        ".",
+                        wasmtime_wasi::DirPerms::all(),
+                        wasmtime_wasi::FilePerms::all(),
+                    )
+                    .map_err(|e| {
+                        rustler::Error::Term(Box::new(format!(
+                            "Failed to preopen directory {}: {}",
+                            dir,
+                            e.to_string()
+                        )))
+                    })?;
             }
         }
     }

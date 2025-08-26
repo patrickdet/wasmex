@@ -72,21 +72,23 @@ pub fn new_instance(
 
     let mut linker = Linker::new(store.engine());
     linker.allow_shadowing(true);
-    
+
     // Add core WASI P2 interfaces (includes filesystem, sockets, clocks, random, io, cli)
-    wasmtime_wasi::p2::add_to_linker_sync(&mut linker)
-        .map_err(|e| rustler::Error::Term(Box::new(format!(
+    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).map_err(|e| {
+        rustler::Error::Term(Box::new(format!(
             "Failed to add WASI P2 interfaces to linker: {}",
             e.to_string()
-        ))))?;
-    
+        )))
+    })?;
+
     // Add HTTP support if enabled
     if store.data().http.is_some() {
-        wasmtime_wasi_http::add_only_http_to_linker_sync(&mut linker)
-            .map_err(|e| rustler::Error::Term(Box::new(format!(
+        wasmtime_wasi_http::add_only_http_to_linker_sync(&mut linker).map_err(|e| {
+            rustler::Error::Term(Box::new(format!(
                 "Failed to add WASI HTTP interfaces to linker: {}",
                 e.to_string()
-            ))))?;
+            )))
+        })?;
     }
 
     // Instantiate the component

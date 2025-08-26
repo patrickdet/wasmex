@@ -1,7 +1,7 @@
 use rustler::ResourceArc;
 use std::collections::HashMap;
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
 
 use crate::wasi_resource::WasiResourceWrapper;
 
@@ -22,10 +22,10 @@ impl ResourceRegistry {
 
     pub fn register_resource(&self, resource: &ResourceArc<WasiResourceWrapper>) -> usize {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
-        
+
         let mut resources = self.resources.lock().unwrap();
         resources.insert(id, resource.clone());
-        
+
         id
     }
 
@@ -66,7 +66,7 @@ mod tests {
     #[test]
     fn test_resource_registration() {
         let registry = ResourceRegistry::new(1);
-        
+
         // TODO: Add actual tests once we can create test resources
         assert_eq!(registry.count_active_resources(), 0);
     }
@@ -74,7 +74,7 @@ mod tests {
     #[test]
     fn test_cleanup_dropped_resources() {
         let registry = ResourceRegistry::new(1);
-        
+
         // Test cleanup doesn't crash on empty registry
         registry.cleanup_dropped_resources();
         assert_eq!(registry.count_active_resources(), 0);
