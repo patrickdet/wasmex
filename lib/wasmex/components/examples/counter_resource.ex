@@ -1,68 +1,137 @@
 defmodule Wasmex.Components.Examples.CounterResource do
   @moduledoc """
-  Example implementation of a host-defined counter resource.
+  Example implementation of a counter resource.
   
-  This demonstrates how to create a simple stateful resource that can be
-  passed to and used by WASM components.
+  This demonstrates how to create a stateful resource that runs as a process,
+  with automatic cleanup and no need for manual drop() calls.
+  
+  ## Key Features
+  
+  - Runs as a GenServer process
+  - State is managed internally by the process
+  - No need to thread state through method returns
+  - Automatic cleanup on process termination
+  - Can crash without affecting other resources
+  
+  ## Usage
+  
+      # Start the resource (usually done via ResourceManager)
+      {:ok, pid} = ResourceServer.start_link(
+        CounterResource, 
+        %{initial_value: 10, name: "my-counter"}
+      )
+      
+      # Call methods
+      {:ok, 11} = ResourceServer.call_method(pid, "increment", [])
+      {:ok, 10} = ResourceServer.call_method(pid, "decrement", [])
+      {:ok, 10} = ResourceServer.call_method(pid, "get-value", [])
+      
+      # Process automatically cleans up on termination
   """
   
-  defstruct [:value, :name]
+  @behaviour Wasmex.Components.ResourceBehaviour
   
-  @doc """
-  Creates a new counter resource with an initial value.
-  """
-  def new(initial_value \\ 0, name \\ "default") do
-    %__MODULE__{value: initial_value, name: name}
+  require Logger
+  
+  defmodule State do
+    @moduledoc false
+    defstruct value: 0, name: "default", operation_count: 0
   end
   
-  defimpl Wasmex.Components.HostResource do
-    def type_name(_resource), do: "example-counter"
+  # ResourceBehaviour callbacks
+  
+  @impl true
+  def type_name, do: "counter"
+  
+  @impl true
+  def init(args) when is_map(args) do
+    initial_value = Map.get(args, :initial_value, 0)
+    name = Map.get(args, :name, "default")
     
-    def call_method(resource, "increment", []) do
-      new_value = resource.value + 1
-      updated = %{resource | value: new_value}
-      {:ok, {updated, new_value}}
-    end
+    Logger.debug("Initializing CounterResource: #{name} with value: #{initial_value}")
     
-    def call_method(resource, "increment", [amount]) when is_integer(amount) do
-      new_value = resource.value + amount
-      updated = %{resource | value: new_value}
-      {:ok, {updated, new_value}}
-    end
-    
-    def call_method(resource, "decrement", []) do
-      new_value = resource.value - 1
-      updated = %{resource | value: new_value}
-      {:ok, {updated, new_value}}
-    end
-    
-    def call_method(resource, "get-value", []) do
-      {:ok, resource.value}
-    end
-    
-    def call_method(resource, "reset", []) do
-      updated = %{resource | value: 0}
-      {:ok, {updated, nil}}
-    end
-    
-    def call_method(resource, "get-name", []) do
-      {:ok, resource.name}
-    end
-    
-    def call_method(resource, "set-name", [new_name]) when is_binary(new_name) do
-      updated = %{resource | name: new_name}
-      {:ok, {updated, nil}}
-    end
-    
-    def call_method(_resource, method, params) do
-      {:error, "Unknown method: #{method} with params: #{inspect(params)}"}
-    end
-    
-    def drop(resource) do
-      # For this simple example, just log the drop
-      require Logger
-      Logger.debug("Dropping counter resource: #{resource.name} with value: #{resource.value}")
-      :ok
-    end
+    {:ok, %State{value: initial_value, name: name, operation_count: 0}}
+  end
+  
+  def init(initial_value) when is_integer(initial_value) do
+    init(%{initial_value: initial_value})
+  end
+  
+  def init(_args) do
+    init(%{})
+  end
+  
+  @impl true
+  def handle_method("increment", [], state) do
+    new_value = state.value + 1
+    new_state = %State{state | value: new_value, operation_count: state.operation_count + 1}
+    {:reply, new_value, new_state}
+  end
+  
+  def handle_method("increment", [amount], state) when is_integer(amount) do
+    new_value = state.value + amount
+    new_state = %State{state | value: new_value, operation_count: state.operation_count + 1}
+    {:reply, new_value, new_state}
+  end
+  
+  def handle_method("decrement", [], state) do
+    new_value = state.value - 1
+    new_state = %State{state | value: new_value, operation_count: state.operation_count + 1}
+    {:reply, new_value, new_state}
+  end
+  
+  def handle_method("decrement", [amount], state) when is_integer(amount) do
+    new_value = state.value - amount
+    new_state = %State{state | value: new_value, operation_count: state.operation_count + 1}
+    {:reply, new_value, new_state}
+  end
+  
+  def handle_method("get-value", [], state) do
+    {:reply, state.value, state}
+  end
+  
+  def handle_method("reset", [], state) do
+    new_state = %State{state | value: 0, operation_count: state.operation_count + 1}
+    {:reply, 0, new_state}
+  end
+  
+  def handle_method("get-name", [], state) do
+    {:reply, state.name, state}
+  end
+  
+  def handle_method("set-name", [new_name], state) when is_binary(new_name) do
+    new_state = %State{state | name: new_name, operation_count: state.operation_count + 1}
+    {:noreply, new_state}
+  end
+  
+  def handle_method("get-stats", [], state) do
+    stats = %{
+      value: state.value,
+      name: state.name,
+      operation_count: state.operation_count,
+      process: self()
+    }
+    {:reply, stats, state}
+  end
+  
+  def handle_method("crash", [], _state) do
+    # Intentionally crash to demonstrate process isolation
+    raise "Intentional crash for testing"
+  end
+  
+  def handle_method(method, params, state) do
+    Logger.warning("Unknown method: #{method} with params: #{inspect(params)}")
+    {:error, "Unknown method: #{method}", state}
+  end
+  
+  @impl true
+  def terminate(reason, state) do
+    Logger.debug(
+      "CounterResource terminating: #{state.name} " <>
+      "with final value: #{state.value}, " <>
+      "operations performed: #{state.operation_count}, " <>
+      "reason: #{inspect(reason)}"
+    )
+    :ok
   end
 end
