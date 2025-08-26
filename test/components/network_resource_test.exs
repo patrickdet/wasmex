@@ -57,7 +57,7 @@ defmodule Wasmex.ComponentNetworkResourceTest do
       receive do
         {:returned_function_call, {:ok, socket}, ^from} ->
           assert is_reference(socket)
-          IO.puts("Created TCP socket resource: #{inspect(socket)}")
+          # Successfully created TCP socket resource (reference checked)
         {:returned_function_call, {:error, error}, ^from} ->
           flunk("Error creating TCP socket: #{inspect(error)}")
       after
@@ -66,7 +66,7 @@ defmodule Wasmex.ComponentNetworkResourceTest do
       end
     end
     
-    test "TCP socket connect operation", %{instance: instance, store: store} do
+    test "TCP socket connect operation", %{instance: instance} do
       from = self()
       
       # Create socket
@@ -77,7 +77,7 @@ defmodule Wasmex.ComponentNetworkResourceTest do
         from
       )
       
-      socket = receive do
+      _socket = receive do
         {:returned_function_call, {:ok, socket}, ^from} -> socket
         {:returned_function_call, {:error, error}, ^from} ->
           flunk("Error creating TCP socket: #{inspect(error)}")
@@ -85,20 +85,8 @@ defmodule Wasmex.ComponentNetworkResourceTest do
         5000 -> flunk("Timeout creating TCP socket")
       end
       
-      # Try to connect (if resource methods are implemented)
-      if function_exported?(Wasmex.Components.Resource, :call_method, 4) do
-        result = Wasmex.Components.Resource.call_method(
-          socket,
-          "connect",
-          ["127.0.0.1", 8080],
-          store
-        )
-        
-        case result do
-          {:ok, _} -> assert true
-          {:error, _} -> assert true  # Connection might fail, that's ok for test
-        end
-      end
+      # Note: Resource method calls would be tested here if call_method was available.
+      # Currently verifying that the socket resource was created successfully.
     end
     
     test "multiple TCP sockets can coexist", %{instance: instance} do
@@ -166,7 +154,7 @@ defmodule Wasmex.ComponentNetworkResourceTest do
       receive do
         {:returned_function_call, {:ok, socket}, ^from} ->
           assert is_reference(socket)
-          IO.puts("Created UDP socket resource: #{inspect(socket)}")
+          # Successfully created UDP socket resource (reference checked)
         {:returned_function_call, {:error, error}, ^from} ->
           flunk("Error creating UDP socket: #{inspect(error)}")
       after
@@ -175,7 +163,7 @@ defmodule Wasmex.ComponentNetworkResourceTest do
       end
     end
     
-    test "UDP socket bind operation", %{instance: instance, store: store} do
+    test "UDP socket bind operation", %{instance: instance} do
       from = self()
       
       # Create socket
@@ -186,7 +174,7 @@ defmodule Wasmex.ComponentNetworkResourceTest do
         from
       )
       
-      socket = receive do
+      _socket = receive do
         {:returned_function_call, {:ok, socket}, ^from} -> socket
         {:returned_function_call, {:error, error}, ^from} ->
           flunk("Error creating UDP socket: #{inspect(error)}")
@@ -194,20 +182,8 @@ defmodule Wasmex.ComponentNetworkResourceTest do
         5000 -> flunk("Timeout creating UDP socket")
       end
       
-      # Try to bind (if resource methods are implemented)
-      if function_exported?(Wasmex.Components.Resource, :call_method, 4) do
-        result = Wasmex.Components.Resource.call_method(
-          socket,
-          "bind",
-          ["0.0.0.0", 0],
-          store
-        )
-        
-        case result do
-          {:ok, _} -> assert true
-          {:error, _} -> assert true  # Bind might fail, that's ok for test
-        end
-      end
+      # Note: Resource method calls would be tested here if call_method was available.
+      # Currently verifying that the socket resource was created successfully.
     end
   end
   
@@ -234,7 +210,7 @@ defmodule Wasmex.ComponentNetworkResourceTest do
       receive do
         {:returned_function_call, {:ok, client}, ^from} ->
           assert is_reference(client)
-          IO.puts("Created HTTP client resource: #{inspect(client)}")
+          # Successfully created HTTP client resource (reference checked)
         {:returned_function_call, {:error, error}, ^from} ->
           flunk("Error creating HTTP client: #{inspect(error)}")
       after
@@ -243,7 +219,7 @@ defmodule Wasmex.ComponentNetworkResourceTest do
       end
     end
     
-    test "HTTP client request operation", %{instance: instance, store: store} do
+    test "HTTP client request operation", %{instance: instance} do
       from = self()
       
       # Create client
@@ -254,7 +230,7 @@ defmodule Wasmex.ComponentNetworkResourceTest do
         from
       )
       
-      client = receive do
+      _client = receive do
         {:returned_function_call, {:ok, client}, ^from} -> client
         {:returned_function_call, {:error, error}, ^from} ->
           flunk("Error creating HTTP client: #{inspect(error)}")
@@ -262,23 +238,8 @@ defmodule Wasmex.ComponentNetworkResourceTest do
         5000 -> flunk("Timeout creating HTTP client")
       end
       
-      # Try to make a request (if resource methods are implemented)
-      if function_exported?(Wasmex.Components.Resource, :call_method, 4) do
-        result = Wasmex.Components.Resource.call_method(
-          client,
-          "request",
-          ["GET", "http://example.com", [], nil],
-          store
-        )
-        
-        case result do
-          {:ok, response} when is_reference(response) -> 
-            assert true
-            # Could test response methods here
-          {:ok, _} -> assert true
-          {:error, _} -> assert true  # Request might fail, that's ok for test
-        end
-      end
+      # Note: Resource method calls would be tested here if call_method was available.
+      # Currently verifying that the client resource was created successfully.
     end
   end
   

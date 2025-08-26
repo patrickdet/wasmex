@@ -405,10 +405,7 @@ pub fn term_to_val(
 /// Convert a Wasm value to an Elixir term.
 ///
 /// Used to for Wasm function calls when passing Wasm params to an Elixir function call.
-/// The opposite of this is `term_to_val`, similar to `convert_result_term`.
-pub fn val_to_term<'a>(val: &Val, env: rustler::Env<'a>, path: Vec<String>) -> Term<'a> {
-    val_to_term_with_store(val, env, path, 0)
-}
+// Removed unused function val_to_term - use val_to_term_with_store directly if needed
 
 pub fn val_to_term_with_store<'a>(val: &Val, env: rustler::Env<'a>, mut path: Vec<String>, store_id: usize) -> Term<'a> {
     match val {
@@ -538,11 +535,7 @@ pub fn val_to_term_with_store<'a>(val: &Val, env: rustler::Env<'a>, mut path: Ve
     }
 }
 
-pub fn vals_to_terms<'a>(vals: &[Val], env: rustler::Env<'a>) -> Vec<Term<'a>> {
-    vals.iter()
-        .map(|val| val_to_term(val, env, vec![]))
-        .collect::<Vec<Term<'a>>>()
-}
+// Removed unused function vals_to_terms - use vals_to_terms_with_store directly if needed
 
 pub fn vals_to_terms_with_store<'a>(vals: &[Val], env: rustler::Env<'a>, store_id: usize) -> Vec<Term<'a>> {
     vals.iter()
@@ -574,9 +567,7 @@ pub fn convert_params(param_types: &[Type], param_terms: Vec<Term>) -> Result<Ve
     Ok(params)
 }
 
-pub fn encode_result<'a>(env: &rustler::Env<'a>, vals: Vec<Val>, from: Term<'a>) -> Term<'a> {
-    encode_result_with_store(env, vals, from, 0)
-}
+// Removed unused function encode_result - use encode_result_with_store directly if needed
 
 pub fn encode_result_with_store<'a>(env: &rustler::Env<'a>, vals: Vec<Val>, from: Term<'a>, store_id: usize) -> Term<'a> {
     let result_term = match vals.len() {

@@ -1,7 +1,7 @@
 defmodule Wasmex.Components.HostResourceTest do
   use ExUnit.Case, async: true
 
-  alias Wasmex.Components.{Store, Component, Instance}
+  alias Wasmex.Components.Store
 
   describe "host resource type registration" do
     test "registers a host resource type" do
@@ -195,17 +195,20 @@ defmodule Wasmex.Components.HostResourceTest do
       @behaviour Wasmex.Components.ResourceBehaviour
 
       @impl true
+      def type_name, do: "test-host-resource"
+
+      @impl true
       def init(args), do: {:ok, args}
 
       @impl true
-      def call_method("get_state", [], state), do: {:ok, state, state}
-      def call_method("set_state", [new_state], _state), do: {:ok, :ok, new_state}
-      def call_method("increment", [], state) when is_integer(state), do: {:ok, state + 1, state + 1}
-      def call_method(_, _, state), do: {:error, :unknown_method, state}
+      def handle_method("get_state", [], state), do: {:reply, state, state}
+      def handle_method("set_state", [new_state], _state), do: {:reply, :ok, new_state}
+      def handle_method("increment", [], state) when is_integer(state), do: {:reply, state + 1, state + 1}
+      def handle_method(_, _, state), do: {:error, "unknown_method", state}
 
       @impl true
-      def drop(_reason, state) do
-        {:ok, state}
+      def terminate(_reason, _state) do
+        :ok
       end
     end
 
@@ -222,7 +225,7 @@ defmodule Wasmex.Components.HostResourceTest do
       
       # Create host resource with process ID as resource_id
       resource_id = :erlang.phash2(pid)
-      resource = Wasmex.Native.host_resource_new(store.resource, resource_id, "process-resource")
+      _resource = Wasmex.Native.host_resource_new(store.resource, resource_id, "process-resource")
       
       # The actual method dispatch would go through the process
       # This is a conceptual test showing the integration pattern

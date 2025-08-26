@@ -38,12 +38,13 @@ defmodule TestHelper do
     do: "#{@wasi_test_source_dir}/target/wasm32-wasip1/debug/main.wasm"
 
   def precompile_wasm_files do
-    {"", 0} = System.cmd("cargo", ["build"], cd: @wasm_test_source_dir)
-    {"", 0} = System.cmd("cargo", ["build"], cd: @wasm_import_test_source_dir)
-    {"", 0} = System.cmd("cargo", ["build"], cd: @wasm_link_import_test_source_dir)
-    {"", 0} = System.cmd("cargo", ["build"], cd: @wasi_test_source_dir)
+    # Suppress cargo output by collecting into a list (discarded)
+    {_output, 0} = System.cmd("cargo", ["build"], cd: @wasm_test_source_dir, stderr_to_stdout: true, into: [])
+    {_output, 0} = System.cmd("cargo", ["build"], cd: @wasm_import_test_source_dir, stderr_to_stdout: true, into: [])
+    {_output, 0} = System.cmd("cargo", ["build"], cd: @wasm_link_import_test_source_dir, stderr_to_stdout: true, into: [])
+    {_output, 0} = System.cmd("cargo", ["build"], cd: @wasi_test_source_dir, stderr_to_stdout: true, into: [])
 
-    {"", 0} =
+    {_output, 0} =
       System.cmd(
         "cargo",
         [
@@ -53,10 +54,12 @@ defmodule TestHelper do
           "--extern",
           "utils=#{@wasm_test_source_dir}/target/wasm32-unknown-unknown/debug/wasmex_test.wasm"
         ],
-        cd: @wasm_link_test_source_dir
+        cd: @wasm_link_test_source_dir,
+        stderr_to_stdout: true,
+        into: []
       )
 
-    {"", 0} =
+    {_output, 0} =
       System.cmd(
         "cargo",
         [
@@ -66,14 +69,16 @@ defmodule TestHelper do
           "--extern",
           "calculator=#{@wasm_link_test_source_dir}/target/wasm32-unknown-unknown/debug/wasmex_link_test.wasm"
         ],
-        cd: @wasm_link_dep_test_source_dir
+        cd: @wasm_link_dep_test_source_dir,
+        stderr_to_stdout: true,
+        into: []
       )
 
-    {"", 0} =
-      System.cmd("cargo", ["component", "build"], cd: @component_type_conversions_source_dir)
+    {_output, 0} =
+      System.cmd("cargo", ["component", "build"], cd: @component_type_conversions_source_dir, stderr_to_stdout: true, into: [])
 
-    {"", 0} =
-      System.cmd("cargo", ["component", "build"], cd: @component_exported_interface_source_dir)
+    {_output, 0} =
+      System.cmd("cargo", ["component", "build"], cd: @component_exported_interface_source_dir, stderr_to_stdout: true, into: [])
   end
 
   def wasm_module do
@@ -156,6 +161,9 @@ defmodule TestHelper do
     end
   end
 end
+
+# Configure Logger for tests to suppress debug output
+Logger.configure(level: :warning)
 
 TestHelper.precompile_wasm_files()
 ExUnit.start()

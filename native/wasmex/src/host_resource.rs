@@ -381,9 +381,7 @@ pub fn drop_host_resource(resource_id: u64) -> NifResult<()> {
     
     instances.remove(&resource_id);
     
-    #[cfg(debug_assertions)]
-    eprintln!("Dropped host resource: {}", resource_id);
-    
+    // Successfully dropped host resource
     Ok(())
 }
 
@@ -394,7 +392,7 @@ pub fn host_resource_call_method<'a>(
     env: Env<'a>,
     store_resource: ResourceArc<ComponentStoreResource>,
     resource: ResourceArc<WasiResourceWrapper>,
-    method_name: String,
+    _method_name: String,
     params: Vec<Term<'a>>,
 ) -> NifResult<Term<'a>> {
     let store = store_resource.inner.lock().map_err(|e| {
@@ -427,7 +425,7 @@ pub fn host_resource_call_method<'a>(
     
     // Here we would dispatch the method call through wasmtime
     // For now, this is a placeholder
-    eprintln!("Calling method {} on host resource", method_name);
+    // Calling method on host resource
     
     // Return a placeholder result
     Ok(atoms::ok().encode(env))

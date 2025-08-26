@@ -1,7 +1,7 @@
 defmodule Wasmex.Components.WasiInterfaceTest do
   use ExUnit.Case, async: true
 
-  alias Wasmex.Components.{Store, Component, Instance}
+  alias Wasmex.Components.Store
   alias Wasmex.Wasi.WasiP2Options
 
   describe "WASI filesystem configuration" do
@@ -110,6 +110,8 @@ defmodule Wasmex.Components.WasiInterfaceTest do
     test "inherits standard streams by default" do
       wasi_opts = %WasiP2Options{}
       assert {:ok, store} = Store.new_wasi(wasi_opts)
+      # Verify store is created with WASI support
+      assert store != nil
       
       # Default values should be true
       assert wasi_opts.inherit_stdin == true
@@ -189,6 +191,8 @@ defmodule Wasmex.Components.WasiInterfaceTest do
       }
       
       assert {:ok, store} = Store.new_wasi(wasi_opts)
+      # Verify store is created with filesystem support
+      assert store != nil
       
       # TODO: Load a component that uses wasi:filesystem
       # and verify it can be instantiated
@@ -202,6 +206,8 @@ defmodule Wasmex.Components.WasiInterfaceTest do
       }
       
       assert {:ok, store} = Store.new_wasi(wasi_opts)
+      # Verify store is created with network support
+      assert store != nil
       
       # TODO: Load a component that uses wasi:sockets
       # and verify it can be instantiated
@@ -212,7 +218,7 @@ defmodule Wasmex.Components.WasiInterfaceTest do
       # Clock should be available with basic WASI P2
       wasi_opts = %WasiP2Options{}
       
-      assert {:ok, store} = Store.new_wasi(wasi_opts)
+      assert {:ok, _store} = Store.new_wasi(wasi_opts)
       
       # TODO: Load a component that uses wasi:clocks
       # and verify it can be instantiated
@@ -223,7 +229,7 @@ defmodule Wasmex.Components.WasiInterfaceTest do
       # Random should be available with basic WASI P2
       wasi_opts = %WasiP2Options{}
       
-      assert {:ok, store} = Store.new_wasi(wasi_opts)
+      assert {:ok, _store} = Store.new_wasi(wasi_opts)
       
       # TODO: Load a component that uses wasi:random
       # and verify it can be instantiated

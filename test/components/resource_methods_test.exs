@@ -256,7 +256,8 @@ defmodule Wasmex.ComponentResourceMethodsTest do
     end
     
     test "error when calling method on resource from wrong store", %{instance: instance} do
-      %{instance_resource: instance_resource} = instance
+      # The instance is the struct itself, get the store from inside it
+      assert instance.store_resource != nil
       from = self()
       
       # Create a counter in the original store

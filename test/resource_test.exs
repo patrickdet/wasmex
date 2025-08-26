@@ -47,27 +47,4 @@ defmodule Wasmex.ResourceTest do
   # 1. A test component with resource types
   # 2. Store and component instance setup
   # 3. Actual resource creation and manipulation
-  
-  describe "WASI resource integration" do
-    @describetag :skip
-    
-    setup do
-      # This would set up a store and load a test component
-      # with resource types
-      :ok
-    end
-    
-    test "can create and drop an owned resource" do
-      # Test creating a resource from a component function
-      # and then dropping it
-    end
-    
-    test "can pass borrowed resources to functions" do
-      # Test passing a borrowed resource to a component function
-    end
-    
-    test "resource registry tracks active resources" do
-      # Test that the resource registry properly tracks resources
-    end
-  end
 end

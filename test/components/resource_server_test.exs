@@ -88,6 +88,7 @@ defmodule Wasmex.Components.ResourceServerTest do
       ResourceServer.stop(pid)
     end
     
+    @tag :capture_log
     test "unknown method returns error" do
       {:ok, pid} = ResourceServer.start_link(CounterResource, 0)
       
@@ -125,6 +126,7 @@ defmodule Wasmex.Components.ResourceServerTest do
         ResourceServer.call_method(pid, "get-value", [])
     end
     
+    @tag :capture_log
     test "process isolation - crash in one resource doesn't affect others" do
       # Start two resources
       {:ok, pid1} = ResourceServer.start_link(CounterResource, 10)
@@ -177,30 +179,6 @@ defmodule Wasmex.Components.ResourceServerTest do
       end
     end
     
-    @tag :skip
-    test "creates and manages process resources", %{manager: _manager} do
-      # Create a mock store
-      store = %{id: :test_store}
-      
-      # This test would require the NIF to be updated to support process resources
-      # For now, we're demonstrating the intended API
-      
-      # Create a resource
-      case ResourceManager.create_resource(
-        store,
-        CounterResource,
-        %{initial_value: 100, name: "managed-counter"}
-      ) do
-        {:ok, _handle} ->
-          # Would test resource management here
-          assert true
-          
-        {:error, reason} ->
-          # Expected until NIFs are updated
-          assert reason =~ "NIF not yet implemented"
-      end
-    end
-    
     test "get_resource_info provides debugging information", %{manager: _manager} do
       info = ResourceManager.get_resource_info()
       
@@ -215,6 +193,10 @@ defmodule Wasmex.Components.ResourceServerTest do
   
   describe "Process resource lifecycle" do
     test "resource process terminates cleanly" do
+      # Temporarily enable debug logging for this test
+      original_level = Logger.level()
+      Logger.configure(level: :debug)
+      
       # Capture log messages
       log_capture = ExUnit.CaptureLog.capture_log(fn ->
         {:ok, pid} = ResourceServer.start_link(
@@ -232,6 +214,9 @@ defmodule Wasmex.Components.ResourceServerTest do
         # Give it time to log
         :timer.sleep(10)
       end)
+      
+      # Restore original log level
+      Logger.configure(level: original_level)
       
       # Verify termination was logged
       assert log_capture =~ "CounterResource terminating"
