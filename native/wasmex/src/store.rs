@@ -52,6 +52,9 @@ pub struct ExWasiP2Options {
     inherit_stdout: bool,
     inherit_stderr: bool,
     allow_http: bool,
+    allow_filesystem: Option<bool>,
+    allow_network: Option<bool>,
+    preopen_dirs: Option<Vec<String>>,
 }
 
 #[derive(NifStruct)]
@@ -282,7 +285,28 @@ pub fn component_store_new_wasi(
         wasi_ctx_builder.inherit_stderr();
     }
 
-    if options.allow_http {
+    // Enable filesystem access if requested (defaults to true for backward compatibility)
+    if options.allow_filesystem.unwrap_or(true) {
+        // Add preopen directories if specified
+        if let Some(preopen_dirs) = &options.preopen_dirs {
+            for dir in preopen_dirs {
+                // Preopen the directory with "." as the guest path
+                // This allows the guest to access files using relative paths
+                wasi_ctx_builder.preopened_dir(
+                    dir,
+                    ".",
+                    wasmtime_wasi::DirPerms::all(),
+                    wasmtime_wasi::FilePerms::all(),
+                ).map_err(|e| rustler::Error::Term(Box::new(format!(
+                    "Failed to preopen directory {}: {}",
+                    dir, e.to_string()
+                ))))?;
+            }
+        }
+    }
+
+    // Enable network access (either through allow_network or allow_http)
+    if options.allow_network.unwrap_or(options.allow_http) || options.allow_http {
         wasi_ctx_builder
             .inherit_network()
             .allow_ip_name_lookup(true);

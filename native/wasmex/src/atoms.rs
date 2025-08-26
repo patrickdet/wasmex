@@ -55,5 +55,6 @@ rustler::atoms! {
     // host resources
     host_resource_manager_module,
     call_method,
+    host_resource_call,
     nil,
 }

@@ -1,34 +1,71 @@
 use rustler::{Encoder, Env, Error, NifResult, ResourceArc, Term};
-use std::sync::Mutex;
-use wasmtime::component::{ResourceAny, Val};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, RwLock};
+use wasmtime::component::{Resource, ResourceAny, ResourceType as WasmResourceType, Val};
 use wasmtime::Store;
 
 use crate::atoms;
 use crate::store::{ComponentStoreData, ComponentStoreResource};
 use crate::wasi_resource::{ResourceType, WasiResourceWrapper};
 
-/// Represents a host-defined resource that delegates method calls to Elixir
+// Global registry for host resource types
+lazy_static::lazy_static! {
+    static ref HOST_RESOURCE_TYPES: RwLock<HashMap<String, Arc<WasmResourceType>>> = RwLock::new(HashMap::new());
+    static ref HOST_RESOURCE_INSTANCES: RwLock<HashMap<u64, HostResourceInstance>> = RwLock::new(HashMap::new());
+}
+
+/// Represents a host-defined resource instance
 #[derive(Debug, Clone)]
-pub struct HostResource {
+pub struct HostResourceInstance {
     /// Unique ID for this resource instance
     pub resource_id: u64,
     /// The WIT type name (e.g., "database-connection")
     pub type_name: String,
     /// Store ID this resource belongs to
     pub store_id: usize,
+    /// Internal representation for wasmtime
+    pub rep: u32,
 }
 
-impl HostResource {
-    pub fn new(resource_id: u64, type_name: String, store_id: usize) -> Self {
-        HostResource {
+/// Phantom type for host resources
+#[derive(Debug, Clone)]
+pub struct HostResource {
+    pub type_name: String,
+}
+
+impl HostResourceInstance {
+    pub fn new(resource_id: u64, type_name: String, store_id: usize, rep: u32) -> Self {
+        HostResourceInstance {
             resource_id,
             type_name,
             store_id,
+            rep,
         }
     }
 }
 
-/// NIF to create a new host resource
+/// Register a host resource type with wasmtime
+#[rustler::nif(name = "host_resource_type_register")]
+pub fn host_resource_type_register(
+    type_name: String,
+) -> NifResult<rustler::Atom> {
+    // Create a new host resource type
+    let resource_type = WasmResourceType::host::<HostResource>();
+    
+    // Store it in our global registry
+    let mut types = HOST_RESOURCE_TYPES.write().map_err(|e| {
+        Error::Term(Box::new(format!(
+            "Could not lock host resource types: {}",
+            e.to_string()
+        )))
+    })?;
+    
+    types.insert(type_name.clone(), Arc::new(resource_type));
+    
+    Ok(atoms::ok())
+}
+
+/// NIF to create a new host resource instance
 #[rustler::nif(name = "host_resource_new")]
 pub fn host_resource_new(
     store_resource: ResourceArc<ComponentStoreResource>,
@@ -44,24 +81,39 @@ pub fn host_resource_new(
 
     let store_id = store.data().store_id;
 
-    // Create the host resource
-    let host_resource = HostResource::new(resource_id, type_name.clone(), store_id);
+    // Get the resource type from our registry
+    let types = HOST_RESOURCE_TYPES.read().map_err(|e| {
+        Error::Term(Box::new(format!(
+            "Could not lock host resource types: {}",
+            e.to_string()
+        )))
+    })?;
+    
+    let _resource_type = types.get(&type_name)
+        .ok_or_else(|| Error::Term(Box::new(format!(
+            "Host resource type '{}' not registered. Call host_resource_type_register first.",
+            type_name
+        ))))?;
 
+    // Create a unique representation for this resource instance
+    // In a real system, this would be managed by a resource table
+    let rep = resource_id as u32; // Simple mapping for now
+    
+    // Create the host resource instance
+    let host_instance = HostResourceInstance::new(resource_id, type_name.clone(), store_id, rep);
+    
+    // Store the instance in our global registry
+    let mut instances = HOST_RESOURCE_INSTANCES.write().map_err(|e| {
+        Error::Term(Box::new(format!(
+            "Could not lock host resource instances: {}",
+            e.to_string()
+        )))
+    })?;
+    
+    instances.insert(resource_id, host_instance.clone());
+    
     // Create a ResourceAny that wraps our host resource
-    // This will require implementing the necessary traits for wasmtime
-    // For now, we'll create a placeholder that can be expanded
-    
-    // Note: In a full implementation, we'd need to:
-    // 1. Define a custom resource type in wasmtime
-    // 2. Register it with the component model
-    // 3. Implement method dispatch that calls back to Elixir
-    
-    // For now, we'll create a simplified version that demonstrates the concept
-    // The actual wasmtime integration would require more complex trait implementations
-    
-    // Create a dummy ResourceAny for demonstration
-    // In production, this would be a proper wasmtime resource
-    let resource_any = create_host_resource_any(host_resource, &mut *store)?;
+    let resource_any = create_host_resource_any(host_instance, &mut *store)?;
 
     // Wrap it in our WasiResourceWrapper
     let wrapper = WasiResourceWrapper {
@@ -77,45 +129,91 @@ pub fn host_resource_new(
 }
 
 /// Creates a ResourceAny for a host resource
-/// 
-/// This is a placeholder implementation. In a full implementation, this would:
-/// 1. Create a proper wasmtime Resource
-/// 2. Register it with the component model
-/// 3. Set up method dispatch callbacks
 fn create_host_resource_any(
-    _host_resource: HostResource,
-    _store: &mut Store<ComponentStoreData>,
+    host_instance: HostResourceInstance,
+    store: &mut Store<ComponentStoreData>,
 ) -> NifResult<ResourceAny> {
-    // This is a simplified placeholder
-    // A full implementation would require:
-    // - Defining a custom wasmtime::component::Resource implementation
-    // - Registering callbacks for method dispatch
-    // - Setting up proper type information
+    // Create an owned Resource with our representation
+    let resource = Resource::<HostResource>::new_own(host_instance.rep);
     
-    Err(Error::Term(Box::new(
-        "Host resource creation not yet fully implemented - requires wasmtime Resource trait implementation".to_string()
-    )))
+    // Convert to ResourceAny
+    let resource_any = resource.try_into_resource_any(store).map_err(|e| {
+        Error::Term(Box::new(format!(
+            "Failed to convert resource to ResourceAny: {}",
+            e.to_string()
+        )))
+    })?;
+    
+    Ok(resource_any)
 }
 
 /// Dispatch a method call from WASM to a host resource in Elixir
 /// 
 /// This function is called by wasmtime when a WASM component invokes a method
 /// on a host-defined resource. It bridges the call to Elixir code.
+///
+/// ## Current Limitation
+/// 
+/// This implementation currently sends a message to the Elixir process but does not
+/// wait for a response. It returns a placeholder value (true) immediately.
+/// 
+/// A proper implementation would require one of these approaches:
+/// 1. **Threaded NIF**: Use a separate OS thread to block waiting for the response
+/// 2. **Async/await pattern**: Redesign the interface to be asynchronous 
+/// 3. **Message queue**: Implement a message queue with timeout handling
+/// 
+/// The synchronous nature of wasmtime's resource method calls makes this challenging
+/// in the NIF environment where blocking is not allowed.
 pub fn dispatch_host_method(
     env: Env,
-    _resource_id: u64,
-    _method_name: String,
+    resource_rep: u32,
+    method_name: String,
     params: Vec<Val>,
+    pid: rustler::LocalPid,
 ) -> NifResult<Val> {
-    // Convert wasmtime Val parameters to Elixir terms
-    let _elixir_params = convert_vals_to_terms(env, params)?;
+    // Find the resource instance by its representation
+    let instances = HOST_RESOURCE_INSTANCES.read().map_err(|e| {
+        Error::Term(Box::new(format!(
+            "Could not lock host resource instances: {}",
+            e.to_string()
+        )))
+    })?;
     
-    // Call the Elixir host resource manager
-    // Note: In a real implementation, this would use message passing or callbacks
-    // For now, we'll return a placeholder error
-    Err(Error::Term(Box::new(
-        "Host resource method dispatch not fully implemented".to_string()
-    )))
+    // Find resource by rep (simple lookup for now)
+    let resource_instance = instances.values()
+        .find(|inst| inst.rep == resource_rep)
+        .ok_or_else(|| Error::Term(Box::new(format!(
+            "Host resource with rep {} not found",
+            resource_rep
+        ))))?;
+    
+    let resource_id = resource_instance.resource_id;
+    let type_name = resource_instance.type_name.clone();
+    
+    // Convert wasmtime Val parameters to Elixir terms
+    let elixir_params = convert_vals_to_terms(env, params)?;
+    
+    // Create a message to send to the Elixir process
+    // This will be handled by the ResourceManager
+    let msg = rustler::types::tuple::make_tuple(
+        env,
+        &[
+            atoms::host_resource_call().encode(env),
+            resource_id.encode(env),
+            type_name.encode(env),
+            method_name.encode(env),
+            elixir_params.encode(env),
+        ],
+    );
+    
+    // Send message to the Elixir process
+    let _ = env.send(&pid, msg);
+    
+    // TODO: Implement synchronous response handling
+    // This requires architectural changes to handle the blocking nature of
+    // wasmtime resource method calls within the NIF environment.
+    // For now, return a placeholder value.
+    Ok(Val::Bool(true))
 }
 
 /// Convert wasmtime Val values to Elixir terms
@@ -198,21 +296,139 @@ fn val_to_term(env: Env, val: Val) -> NifResult<Term> {
 }
 
 /// Convert an Elixir term back to a wasmtime Val
-fn convert_term_to_val(_env: Env, _term: Term) -> NifResult<Val> {
-    // This would implement the reverse conversion from Elixir terms to wasmtime Val
-    // For now, return a placeholder error
-    Err(Error::Term(Box::new(
-        "Term to Val conversion not yet implemented".to_string()
-    )))
+pub fn convert_term_to_val<'a>(term: Term<'a>) -> NifResult<Val> {
+    // Check for basic types first
+    if let Ok(b) = term.decode::<bool>() {
+        return Ok(Val::Bool(b));
+    }
+    if let Ok(i) = term.decode::<i32>() {
+        return Ok(Val::S32(i));
+    }
+    if let Ok(i) = term.decode::<i64>() {
+        return Ok(Val::S64(i));
+    }
+    if let Ok(u) = term.decode::<u32>() {
+        return Ok(Val::U32(u));
+    }
+    if let Ok(u) = term.decode::<u64>() {
+        return Ok(Val::U64(u));
+    }
+    if let Ok(f) = term.decode::<f32>() {
+        return Ok(Val::Float32(f));
+    }
+    if let Ok(f) = term.decode::<f64>() {
+        return Ok(Val::Float64(f));
+    }
+    if let Ok(s) = term.decode::<String>() {
+        return Ok(Val::String(s.into()));
+    }
+    
+    // Check for list
+    if let Ok(list) = term.decode::<Vec<Term>>() {
+        let vals: NifResult<Vec<Val>> = list.into_iter()
+            .map(|t| convert_term_to_val(t))
+            .collect();
+        return Ok(Val::List(vals?.into()));
+    }
+    
+    // Check for Option (represented as :none or {:some, value})
+    if term.is_atom() {
+        if let Ok(atom) = term.decode::<rustler::Atom>() {
+            if atom == atoms::none() {
+                return Ok(Val::Option(None));
+            }
+        }
+    }
+    
+    if let Ok((tag, value)) = term.decode::<(rustler::Atom, Term)>() {
+        if tag == atoms::some() {
+            let inner = convert_term_to_val(value)?;
+            return Ok(Val::Option(Some(Box::new(inner))));
+        }
+        if tag == atoms::ok() {
+            let inner = convert_term_to_val(value)?;
+            return Ok(Val::Result(Ok(Some(Box::new(inner)))));
+        }
+        if tag == atoms::error() {
+            let inner = convert_term_to_val(value)?;
+            return Ok(Val::Result(Err(Some(Box::new(inner)))));
+        }
+    }
+    
+    // Check for map (records)
+    if let Ok(map) = term.decode::<std::collections::HashMap<String, Term>>() {
+        let mut fields = Vec::new();
+        for (key, val) in map {
+            fields.push((key, convert_term_to_val(val)?));
+        }
+        return Ok(Val::Record(fields));
+    }
+    
+    Err(Error::Term(Box::new(format!(
+        "Cannot convert Elixir term to Val: unsupported type"
+    ))))
 }
 
 /// Handle dropping a host resource
 pub fn drop_host_resource(resource_id: u64) -> NifResult<()> {
-    // This would call back to Elixir to drop the resource
-    // Implementation would involve message passing or registered callbacks
+    // Remove from our registry
+    let mut instances = HOST_RESOURCE_INSTANCES.write().map_err(|e| {
+        Error::Term(Box::new(format!(
+            "Could not lock host resource instances: {}",
+            e.to_string()
+        )))
+    })?;
     
-    // For now, log that we're dropping
-    eprintln!("Dropping host resource: {}", resource_id);
+    instances.remove(&resource_id);
+    
+    #[cfg(debug_assertions)]
+    eprintln!("Dropped host resource: {}", resource_id);
     
     Ok(())
+}
+
+/// NIF to call a method on a host resource from Elixir
+/// This is used when Elixir code wants to invoke methods on host resources
+#[rustler::nif(name = "host_resource_call_method", schedule = "DirtyCpu")]
+pub fn host_resource_call_method<'a>(
+    env: Env<'a>,
+    store_resource: ResourceArc<ComponentStoreResource>,
+    resource: ResourceArc<WasiResourceWrapper>,
+    method_name: String,
+    params: Vec<Term<'a>>,
+) -> NifResult<Term<'a>> {
+    let store = store_resource.inner.lock().map_err(|e| {
+        Error::Term(Box::new(format!(
+            "Could not lock store: {}",
+            e.to_string()
+        )))
+    })?;
+    
+    // Validate store ownership
+    if resource.store_id != store.data().store_id {
+        return Err(Error::Term(Box::new(
+            "Resource does not belong to this store".to_string()
+        )));
+    }
+    
+    // Convert Elixir terms to wasmtime Vals
+    let vals: NifResult<Vec<Val>> = params.into_iter()
+        .map(|t| convert_term_to_val(t))
+        .collect();
+    let _vals = vals?;
+    
+    // Get the resource from the wrapper
+    let _resource_any = resource.inner.lock().map_err(|e| {
+        Error::Term(Box::new(format!(
+            "Could not lock resource: {}",
+            e.to_string()
+        )))
+    })?;
+    
+    // Here we would dispatch the method call through wasmtime
+    // For now, this is a placeholder
+    eprintln!("Calling method {} on host resource", method_name);
+    
+    // Return a placeholder result
+    Ok(atoms::ok().encode(env))
 }

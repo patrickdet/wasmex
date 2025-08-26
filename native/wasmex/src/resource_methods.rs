@@ -96,7 +96,7 @@ fn execute_resource_method(
     };
     
     // Get the instance
-    let mut instance = instance_resource.inner.lock().unwrap();
+    let instance = instance_resource.inner.lock().unwrap();
     
     // Build the full method path (e.g., ["component:counter/types", "[method]counter.increment"])
     let mut method_path = interface_path.clone();
@@ -184,7 +184,7 @@ fn execute_resource_method(
     // Convert the additional parameters
     let param_types: Vec<wasmtime::component::Type> = function
         .params(&*store)
-        .into_iter()
+        .iter()
         .skip(1) // Skip the resource parameter
         .map(|(_, ty)| ty.clone())
         .collect();

@@ -406,7 +406,7 @@ pub fn term_to_val(
 ///
 /// Used to for Wasm function calls when passing Wasm params to an Elixir function call.
 /// The opposite of this is `term_to_val`, similar to `convert_result_term`.
-pub fn val_to_term<'a>(val: &Val, env: rustler::Env<'a>, mut path: Vec<String>) -> Term<'a> {
+pub fn val_to_term<'a>(val: &Val, env: rustler::Env<'a>, path: Vec<String>) -> Term<'a> {
     val_to_term_with_store(val, env, path, 0)
 }
 
@@ -533,13 +533,6 @@ pub fn val_to_term_with_store<'a>(val: &Val, env: rustler::Env<'a>, mut path: Ve
                         format!("Resource conversion error at {:?}: {}", path.join("."), e).encode(env)
                     }
                 }
-            }
-        }
-        _ => {
-            if path.is_empty() {
-                String::from("Unsupported type").encode(env)
-            } else {
-                format!("Unsupported type at {:?}", path.join(".")).encode(env)
             }
         }
     }

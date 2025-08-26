@@ -20,6 +20,15 @@ defmodule Wasmex.Wasi.WasiP2Options do
     * `:allow_http` - When `true`, enables HTTP capabilities for the component.
       Defaults to `false`.
 
+    * `:allow_filesystem` - When `true`, enables filesystem access for the component.
+      Defaults to `true` for backward compatibility.
+
+    * `:allow_network` - When `true`, enables network socket capabilities for the component.
+      Defaults to `nil` (inherits from `:allow_http` setting).
+
+    * `:preopen_dirs` - List of directories to preopen for filesystem access.
+      Defaults to `nil`. Example: `["/tmp", "/home/user/data"]`.
+
     * `:args` - List of command-line arguments to pass to the component.
       Defaults to `[]`.
 
@@ -31,7 +40,9 @@ defmodule Wasmex.Wasi.WasiP2Options do
       iex> wasi_opts = %Wasmex.Wasi.WasiP2Options{
       ...>   args: ["--verbose"],
       ...>   env: %{"DEBUG" => "1"},
-      ...>   allow_http: true
+      ...>   allow_http: true,
+      ...>   allow_filesystem: true,
+      ...>   preopen_dirs: ["/tmp", "/data"]
       ...> }
       iex> {:ok, pid} = Wasmex.Components.start_link(%{
       ...>   path: "my_component.wasm",
@@ -44,6 +55,9 @@ defmodule Wasmex.Wasi.WasiP2Options do
             inherit_stdout: true,
             inherit_stderr: true,
             allow_http: false,
+            allow_filesystem: nil,
+            allow_network: nil,
+            preopen_dirs: nil,
             args: [],
             env: %{}
 
@@ -53,6 +67,9 @@ defmodule Wasmex.Wasi.WasiP2Options do
           inherit_stdin: boolean(),
           inherit_stdout: boolean(),
           inherit_stderr: boolean(),
-          allow_http: boolean()
+          allow_http: boolean(),
+          allow_filesystem: boolean() | nil,
+          allow_network: boolean() | nil,
+          preopen_dirs: [String.t()] | nil
         }
 end
