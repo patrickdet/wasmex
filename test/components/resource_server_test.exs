@@ -3,7 +3,7 @@ defmodule Wasmex.Components.ResourceServerTest do
 
   alias Wasmex.Components.ResourceServer
   alias Wasmex.Components.ResourceManager
-  alias Wasmex.Components.Examples.CounterResource
+  alias Wasmex.Test.Support.Examples.CounterResource
 
   describe "ResourceServer with CounterResource" do
     test "starts resource process successfully" do

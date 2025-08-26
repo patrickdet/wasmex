@@ -1,4 +1,4 @@
-defmodule Wasmex.Components.Examples.SupervisionPatterns do
+defmodule Wasmex.Test.Support.Examples.SupervisionPatterns do
   @moduledoc """
   Common supervision patterns for WASM component resources.
 

@@ -1,4 +1,4 @@
-defmodule Wasmex.Components.Examples.CounterResource do
+defmodule Wasmex.Test.Support.Examples.CounterResource do
   @moduledoc """
   Example implementation of a counter resource.
 

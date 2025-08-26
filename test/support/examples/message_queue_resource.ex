@@ -1,4 +1,4 @@
-defmodule Wasmex.Components.Examples.MessageQueueResource do
+defmodule Wasmex.Test.Support.Examples.MessageQueueResource do
   @moduledoc """
   Example implementation of a message queue resource.
 

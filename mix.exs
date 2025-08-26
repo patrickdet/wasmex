@@ -40,7 +40,7 @@ defmodule Wasmex.MixProject do
   end
 
   # Specifies which paths to compile per environment.
-  defp elixirc_paths(:test), do: ["lib", "test/component_fixtures"]
+  defp elixirc_paths(:test), do: ["lib", "test/component_fixtures", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
   defp aliases do

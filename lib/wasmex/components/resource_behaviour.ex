@@ -5,7 +5,29 @@ defmodule Wasmex.Components.ResourceBehaviour do
   This provides a more idiomatic Elixir approach where each resource is a process
   with automatic cleanup on termination, eliminating the need for manual drop() calls.
 
-  ## Example Implementation
+  ## Quick Example
+
+      defmodule MyCounter do
+        @behaviour Wasmex.Components.ResourceBehaviour
+        
+        @impl true
+        def type_name, do: "counter"
+        
+        @impl true
+        def init(initial_value), do: {:ok, initial_value}
+        
+        @impl true
+        def handle_method("increment", [], count), do: {:reply, count + 1, count + 1}
+        def handle_method("get", [], count), do: {:reply, count, count}
+        def handle_method(_, _, state), do: {:error, "unknown method", state}
+      end
+
+      # Usage
+      {:ok, pid} = Wasmex.Components.ResourceServer.start_link(MyCounter, 0)
+      {:ok, 1} = Wasmex.Components.ResourceServer.call_method(pid, "increment", [])
+      {:ok, 1} = Wasmex.Components.ResourceServer.call_method(pid, "get", [])
+
+  ## Full Example Implementation
 
       defmodule MyApp.DatabaseResource do
         @behaviour Wasmex.Components.ResourceBehaviour

@@ -1,4 +1,4 @@
-defmodule Wasmex.Components.Examples.DatabaseResource do
+defmodule Wasmex.Test.Support.Examples.DatabaseResource do
   @moduledoc """
   Example implementation of a database connection resource.
 
