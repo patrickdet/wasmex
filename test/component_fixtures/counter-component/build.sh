@@ -18,8 +18,4 @@ wasm-tools component new \
 # Validate the component
 wasm-tools validate target/wasm32-wasip2/wasi-release/counter_component_final.wasm
 
-# Copy to expected location for tests
-mkdir -p ../../wasm
-cp target/wasm32-wasip2/wasi-release/counter_component_final.wasm ../../wasm/counter_resource.wasm
-
 echo "Successfully built counter-component!"

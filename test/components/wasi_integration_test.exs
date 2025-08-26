@@ -9,25 +9,6 @@ defmodule Wasmex.Components.WasiIntegrationTest do
   
   @wasi_component_path "test/component_fixtures/wasi-test-component/target/wasm32-wasip2/release/wasi_test_component_final.wasm"
   
-  setup_all do
-    # Build the WASI test component using the build script
-    build_cmd = "cd test/component_fixtures/wasi-test-component && ./build.sh"
-    
-    {output, exit_code} = System.cmd("sh", ["-c", build_cmd], stderr_to_stdout: true)
-    
-    if exit_code != 0 do
-      IO.puts("Build output: #{output}")
-      flunk("Failed to build WASI test component. Make sure you have wasm32-wasip2 target installed: rustup target add wasm32-wasip2")
-    end
-    
-    # Ensure the component file exists
-    unless File.exists?(@wasi_component_path) do
-      flunk("Component file not found at #{@wasi_component_path}")
-    end
-    
-    :ok
-  end
-  
   describe "WASI filesystem operations" do
     setup do
       temp_dir = System.tmp_dir!()

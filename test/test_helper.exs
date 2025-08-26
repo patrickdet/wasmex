@@ -79,6 +79,33 @@ defmodule TestHelper do
 
     {_output, 0} =
       System.cmd("cargo", ["component", "build"], cd: @component_exported_interface_source_dir, stderr_to_stdout: true, into: [])
+
+    # Build new component fixtures
+    component_fixtures_dir = "#{Path.dirname(__ENV__.file)}/component_fixtures"
+    
+    # Build counter-component
+    counter_dir = "#{component_fixtures_dir}/counter-component"
+    if File.exists?(counter_dir) do
+      {_output, _code} = System.cmd("sh", ["build.sh"], cd: counter_dir, stderr_to_stdout: true, into: [])
+    end
+    
+    # Build filesystem-component
+    filesystem_dir = "#{component_fixtures_dir}/filesystem-component"
+    if File.exists?(filesystem_dir) do
+      {_output, _code} = System.cmd("sh", ["build.sh"], cd: filesystem_dir, stderr_to_stdout: true, into: [])
+    end
+    
+    # Build network-component
+    network_dir = "#{component_fixtures_dir}/network-component"
+    if File.exists?(network_dir) do
+      {_output, _code} = System.cmd("sh", ["build.sh"], cd: network_dir, stderr_to_stdout: true, into: [])
+    end
+    
+    # Build wasi-test-component
+    wasi_test_dir = "#{component_fixtures_dir}/wasi-test-component"
+    if File.exists?(wasi_test_dir) do
+      {_output, _code} = System.cmd("sh", ["build.sh"], cd: wasi_test_dir, stderr_to_stdout: true, into: [])
+    end
   end
 
   def wasm_module do
