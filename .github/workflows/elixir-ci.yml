@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - tokio-only-clean
 
 env:
   ELIXIR_VERSION: 1.17.3
