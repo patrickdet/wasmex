@@ -246,7 +246,7 @@ fn component_execute_function_async(
             Ok(vec) => vec,
             Err(err) => {
                 return env
-                    .error_tuple(&format!("could not load 'function params': {err:?}"))
+                    .error_tuple(format!("could not load 'function params': {err:?}"))
                     .encode(env)
             }
         };
@@ -267,14 +267,14 @@ fn component_execute_function_async(
             if lookup_index.is_none() {
                 if function_name_path.len() == 1 {
                     return env
-                        .error_tuple(&format!(
+                        .error_tuple(format!(
                             "exported function `{}` not found.",
                             function_name_path.join(", ")
                         ))
                         .encode(env);
                 } else {
                     return env
-                        .error_tuple(&format!(
+                        .error_tuple(format!(
                         "exported function `[{}]` not found. Could not find `{}` at position {}",
                         function_name_path.join(", "),
                         name,
@@ -289,7 +289,7 @@ fn component_execute_function_async(
             Some(index) => index,
             None => {
                 return env
-                    .error_tuple(&format!(
+                    .error_tuple(format!(
                         "exported function `{}` not found.",
                         function_name_path.join(", ")
                     ))
@@ -302,7 +302,7 @@ fn component_execute_function_async(
             Some(func) => func,
             None => {
                 return env
-                    .error_tuple(&format!(
+                    .error_tuple(format!(
                         "exported function `{}` not found",
                         function_name_path.join(", ")
                     ))
