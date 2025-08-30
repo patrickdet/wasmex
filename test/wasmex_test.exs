@@ -120,7 +120,7 @@ defmodule WasmexTest do
     end
 
     test t(&Wasmex.call_function/3) <> " void() -> () function", %{pid: pid} do
-      assert {:ok, []} == Wasmex.call_function(pid, :void, [])
+      assert {:ok, nil} == Wasmex.call_function(pid, :void, [])
     end
 
     test t(&Wasmex.call_function/3) <> " string() -> string function", %{
@@ -192,7 +192,7 @@ defmodule WasmexTest do
     setup [:setup_atom_imports]
 
     test "call_function using_imported_void for void() -> () callback", %{pid: pid} do
-      assert {:ok, []} == Wasmex.call_function(pid, :using_imported_void, [])
+      assert {:ok, nil} == Wasmex.call_function(pid, :using_imported_void, [])
     end
 
     test "call_function using_imported_sum3", %{pid: pid} do
@@ -312,7 +312,7 @@ defmodule WasmexTest do
       pid = start_supervised!({Wasmex, %{store: store, bytes: bytes}})
       Wasmex.StoreOrCaller.set_fuel(store, 2)
 
-      assert Wasmex.call_function(pid, :void, []) == {:ok, []}
+      assert Wasmex.call_function(pid, :void, []) == {:ok, nil}
       assert Wasmex.StoreOrCaller.get_fuel(store) == {:ok, 1}
 
       assert {:error, err_msg} = Wasmex.call_function(pid, :void, [])
@@ -437,15 +437,14 @@ defmodule WasmexTest do
           add_import:
             {:fn, [:i32, :i32], [:i32],
              fn %{instance: instance, caller: caller}, a, b ->
-               Wasmex.Instance.call_exported_function(caller, instance, "call_add", [a, b], :from)
+               # Create a proper GenServer from tuple
+               ref = make_ref()
+               from = {self(), ref}
+               Wasmex.Instance.call_exported_function(caller, instance, "call_add", [a, b], from)
 
+               # Expect GenServer reply format: {ref, result}
                receive do
-                 {
-                   :returned_function_call,
-                   {:ok, [result]},
-                   :from
-                 } ->
-                   :ok
+                 {^ref, {:ok, [result]}} ->
                    result
                after
                  1000 ->
@@ -474,6 +473,66 @@ defmodule WasmexTest do
       {:ok, pid} = Wasmex.start_link(%{store: store, module: module, instance: instance})
 
       assert {:ok, [42]} == Wasmex.call_function(pid, :sum, [50, -8])
+    end
+  end
+
+  describe "concurrent execution" do
+    test "parallel function calls" do
+      wat = """
+      (module
+        (func $identity (param i32) (result i32)
+          local.get 0)
+        (export "identity" (func $identity))
+      )
+      """
+
+      {:ok, store} = Wasmex.Store.new()
+      {:ok, module} = Wasmex.Module.compile(store, wat)
+      {:ok, pid} = Wasmex.start_link(%{store: store, module: module})
+
+      # Launch multiple concurrent calls
+      tasks =
+        for i <- 1..10 do
+          Task.async(fn ->
+            {:ok, [^i]} = Wasmex.call_function(pid, :identity, [i])
+            i
+          end)
+        end
+
+      results = Task.await_many(tasks)
+      assert results == Enum.to_list(1..10)
+    end
+
+    test "concurrent memory access" do
+      wat = """
+      (module
+        (memory 1)
+        (export "memory" (memory 0))
+      )
+      """
+
+      {:ok, store} = Wasmex.Store.new()
+      {:ok, module} = Wasmex.Module.compile(store, wat)
+      {:ok, pid} = Wasmex.start_link(%{store: store, module: module})
+      {:ok, memory} = Wasmex.memory(pid)
+
+      # Concurrent reads and writes
+      tasks =
+        for offset <- 0..9 do
+          Task.async(fn ->
+            # Write unique value
+            data = <<offset::32-little>>
+            :ok = Wasmex.Memory.write_binary(store, memory, offset * 4, data)
+
+            # Read it back
+            read_data = Wasmex.Memory.read_binary(store, memory, offset * 4, 4)
+            <<value::32-little>> = read_data
+            value
+          end)
+        end
+
+      results = Task.await_many(tasks)
+      assert results == Enum.to_list(0..9)
     end
   end
 end

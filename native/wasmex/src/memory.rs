@@ -59,7 +59,7 @@ pub fn grow(
     pages: u64,
 ) -> NifResult<u64> {
     let store_or_caller: &mut StoreOrCaller =
-        &mut *(store_or_caller_resource.inner.try_lock().map_err(|e| {
+        &mut *(store_or_caller_resource.inner.lock().map_err(|e| {
             rustler::Error::Term(Box::new(format!(
                 "Could not unlock store_or_caller resource: {e}"
             )))
@@ -177,7 +177,7 @@ pub fn write_binary(
     binary: Binary,
 ) -> NifResult<Atom> {
     let store_or_caller: &mut StoreOrCaller =
-        &mut *(store_or_caller_resource.inner.try_lock().map_err(|e| {
+        &mut *(store_or_caller_resource.inner.lock().map_err(|e| {
             rustler::Error::Term(Box::new(format!(
                 "Could not unlock store_or_caller resource: {e}"
             )))
