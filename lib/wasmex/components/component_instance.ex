@@ -66,11 +66,3 @@ defmodule Wasmex.Components.Instance do
     |> parse_function_path()
   end
 end
-
-defimpl Inspect, for: Wasmex.Components.Instance do
-  import Inspect.Algebra
-
-  def inspect(dict, opts) do
-    concat(["#Wasmex.Components.Instance<", to_doc(dict.reference, opts), ">"])
-  end
-end

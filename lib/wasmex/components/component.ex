@@ -46,11 +46,3 @@ defmodule Wasmex.Components.Component do
     end
   end
 end
-
-defimpl Inspect, for: Wasmex.Components.Component do
-  import Inspect.Algebra
-
-  def inspect(dict, opts) do
-    concat(["#Wasmex.Components.Component<", to_doc(dict.reference, opts), ">"])
-  end
-end

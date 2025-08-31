@@ -534,5 +534,222 @@ defmodule WasmexTest do
       results = Task.await_many(tasks)
       assert results == Enum.to_list(0..9)
     end
+
+    test "high concurrency - 1000 concurrent WebAssembly function calls" do
+      # This test demonstrates Tokio's efficiency with green threads vs OS threads
+      wat = """
+      (module
+        (func $add (export "add") (param i32 i32) (result i32)
+          local.get 0
+          local.get 1
+          i32.add
+        )
+      )
+      """
+
+      {:ok, pid} = Wasmex.start_link(%{bytes: wat})
+
+      # Launch 1000 concurrent operations - would be problematic with OS threads
+      tasks =
+        for i <- 1..1000 do
+          Task.async(fn ->
+            {:ok, [result]} = Wasmex.call_function(pid, :add, [i, i])
+            result
+          end)
+        end
+
+      results = Task.await_many(tasks, 10_000)
+      expected = for i <- 1..1000, do: i * 2
+      assert results == expected
+    end
+
+    test "BEAM scheduler remains responsive during heavy WebAssembly execution" do
+      # Create a WebAssembly module with a CPU-intensive function
+      wat = """
+      (module
+        (func $fibonacci (export "fibonacci") (param i32) (result i32)
+          (local i32 i32 i32 i32)
+          local.get 0
+          i32.const 2
+          i32.lt_s
+          if (result i32)
+            local.get 0
+          else
+            i32.const 0
+            local.set 1
+            i32.const 1
+            local.set 2
+            i32.const 2
+            local.set 3
+            loop
+              local.get 1
+              local.get 2
+              i32.add
+              local.set 4
+              local.get 2
+              local.set 1
+              local.get 4
+              local.set 2
+              local.get 3
+              i32.const 1
+              i32.add
+              local.tee 3
+              local.get 0
+              i32.le_s
+              br_if 0
+            end
+            local.get 2
+          end
+        )
+      )
+      """
+
+      {:ok, pid} = Wasmex.start_link(%{bytes: wat})
+
+      # Start multiple heavy computations
+      wasm_tasks =
+        for n <- [30, 31, 32, 33, 34] do
+          Task.async(fn ->
+            {:ok, [_result]} = Wasmex.call_function(pid, :fibonacci, [n])
+            :completed
+          end)
+        end
+
+      # Meanwhile, ensure BEAM scheduler stays responsive
+      # by doing pure Elixir work in parallel
+      beam_task =
+        Task.async(fn ->
+          start_time = System.monotonic_time(:millisecond)
+          
+          # Do some work that requires scheduler responsiveness
+          for _ <- 1..100 do
+            Process.sleep(1)  # Should complete in ~100ms if scheduler is responsive
+          end
+          
+          elapsed = System.monotonic_time(:millisecond) - start_time
+          elapsed
+        end)
+
+      # The BEAM task should complete quickly even while WASM is running
+      beam_elapsed = Task.await(beam_task, 5_000)
+      
+      # Should take roughly 100-200ms if scheduler isn't blocked
+      # If blocked by WASM, would take much longer
+      assert beam_elapsed < 500, "BEAM scheduler was blocked (took #{beam_elapsed}ms)"
+
+      # Wait for WASM tasks to complete
+      Task.await_many(wasm_tasks, 10_000)
+    end
+
+    test "handles mixed workload efficiently" do
+      # Test with a mix of quick and slow operations
+      wat = """
+      (module
+        (func $quick (export "quick") (param i32) (result i32)
+          local.get 0
+          i32.const 2
+          i32.mul
+        )
+        
+        (func $slow (export "slow") (param i32) (result i32)
+          (local i32 i32)
+          i32.const 0
+          local.set 1
+          i32.const 0
+          local.set 2
+          loop
+            local.get 1
+            local.get 0
+            i32.add
+            local.set 1
+            local.get 2
+            i32.const 1
+            i32.add
+            local.tee 2
+            i32.const 100000
+            i32.lt_s
+            br_if 0
+          end
+          local.get 1
+        )
+      )
+      """
+
+      {:ok, pid} = Wasmex.start_link(%{bytes: wat})
+
+      # Mix of quick and slow operations
+      tasks =
+        for i <- 1..100 do
+          Task.async(fn ->
+            if rem(i, 10) == 0 do
+              # Every 10th is a slow operation
+              {:ok, [result]} = Wasmex.call_function(pid, :slow, [i])
+              {:slow, result}
+            else
+              # Most are quick operations
+              {:ok, [result]} = Wasmex.call_function(pid, :quick, [i])
+              {:quick, result}
+            end
+          end)
+        end
+
+      results = Task.await_many(tasks, 10_000)
+      
+      # Verify all tasks completed
+      assert length(results) == 100
+      
+      # Verify we got the right mix
+      {slow_count, quick_count} = 
+        Enum.reduce(results, {0, 0}, fn
+          {:slow, _}, {s, q} -> {s + 1, q}
+          {:quick, _}, {s, q} -> {s, q + 1}
+        end)
+      
+      assert slow_count == 10
+      assert quick_count == 90
+    end
+
+    test "error handling in highly concurrent scenario" do
+      # Test that errors in some tasks don't affect others
+      wat = """
+      (module
+        (func $may_fail (export "may_fail") (param i32) (result i32)
+          local.get 0
+          i32.const 50
+          i32.gt_s
+          if
+            unreachable  ;; This will trap for values > 50
+          end
+          local.get 0
+          i32.const 2
+          i32.mul
+        )
+      )
+      """
+
+      {:ok, pid} = Wasmex.start_link(%{bytes: wat})
+
+      # Launch many concurrent operations, some will fail
+      tasks =
+        for i <- 1..100 do
+          Task.async(fn ->
+            case Wasmex.call_function(pid, :may_fail, [i]) do
+              {:ok, [result]} -> {:success, result}
+              {:error, _reason} -> {:failed, i}
+            end
+          end)
+        end
+
+      results = Task.await_many(tasks, 10_000)
+      
+      {successes, failures} = Enum.split_with(results, fn
+        {:success, _} -> true
+        {:failed, _} -> false
+      end)
+      
+      # First 50 should succeed, rest should fail
+      assert length(successes) == 50
+      assert length(failures) == 50
+    end
   end
 end

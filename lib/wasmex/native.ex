@@ -24,7 +24,7 @@ defmodule Wasmex.Native do
       x86_64-unknown-linux-gnu
       x86_64-unknown-linux-musl
     ),
-    force_build: true
+    force_build: System.get_env("WASMEX_BUILD") in ["1", "true"]
 
   def engine_new(_engine_config), do: error()
   def engine_precompile_module(_engine_resource, _bytes), do: error()
@@ -81,9 +81,6 @@ defmodule Wasmex.Native do
   def pipe_read_binary(_pipe_resource), do: error()
   def pipe_write_binary(_pipe_resource, _binary), do: error()
 
-  # MVP async functions
-  def store_new(), do: error()
-
   def store_new(_store_limits, _engine_resource), do: error()
   def store_new_wasi(_wasi_options, _store_limits, _engine_resource), do: error()
 
@@ -103,9 +100,6 @@ defmodule Wasmex.Native do
   def wit_exported_functions(_path, _wit), do: error()
 
   def wat_to_wasm(_wat), do: error()
-
-  # Test function for async sleep
-  def test_async_sleep(_ms, _tag), do: error()
 
   # When the NIF is loaded, it will override functions in this module.
   # Calling error is handles the case when the nif could not be loaded.
