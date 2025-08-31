@@ -620,19 +620,20 @@ defmodule WasmexTest do
       beam_task =
         Task.async(fn ->
           start_time = System.monotonic_time(:millisecond)
-          
+
           # Do some work that requires scheduler responsiveness
           for _ <- 1..100 do
-            Process.sleep(1)  # Should complete in ~100ms if scheduler is responsive
+            # Should complete in ~100ms if scheduler is responsive
+            Process.sleep(1)
           end
-          
+
           elapsed = System.monotonic_time(:millisecond) - start_time
           elapsed
         end)
 
       # The BEAM task should complete quickly even while WASM is running
       beam_elapsed = Task.await(beam_task, 5_000)
-      
+
       # Should take roughly 100-200ms if scheduler isn't blocked
       # If blocked by WASM, would take much longer
       assert beam_elapsed < 500, "BEAM scheduler was blocked (took #{beam_elapsed}ms)"
@@ -694,17 +695,17 @@ defmodule WasmexTest do
         end
 
       results = Task.await_many(tasks, 10_000)
-      
+
       # Verify all tasks completed
       assert length(results) == 100
-      
+
       # Verify we got the right mix
-      {slow_count, quick_count} = 
+      {slow_count, quick_count} =
         Enum.reduce(results, {0, 0}, fn
           {:slow, _}, {s, q} -> {s + 1, q}
           {:quick, _}, {s, q} -> {s, q + 1}
         end)
-      
+
       assert slow_count == 10
       assert quick_count == 90
     end
@@ -741,12 +742,13 @@ defmodule WasmexTest do
         end
 
       results = Task.await_many(tasks, 10_000)
-      
-      {successes, failures} = Enum.split_with(results, fn
-        {:success, _} -> true
-        {:failed, _} -> false
-      end)
-      
+
+      {successes, failures} =
+        Enum.split_with(results, fn
+          {:success, _} -> true
+          {:failed, _} -> false
+        end)
+
       # First 50 should succeed, rest should fail
       assert length(successes) == 50
       assert length(failures) == 50

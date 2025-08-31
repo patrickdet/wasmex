@@ -224,7 +224,7 @@ pub fn call_exported_function(
 
     TOKIO_RUNTIME.spawn(async move {
         // Execute function and get the result
-        let result = execute_function_async(
+        let result = execute_function(
             &mut thread_env,
             store_or_caller_resource,
             instance_resource,
@@ -263,7 +263,7 @@ pub fn call_exported_function(
     atoms::ok()
 }
 
-fn execute_function_async(
+fn execute_function(
     thread_env: &mut OwnedEnv,
     store_or_caller_resource: ResourceArc<StoreOrCallerResource>,
     instance_resource: ResourceArc<InstanceResource>,
