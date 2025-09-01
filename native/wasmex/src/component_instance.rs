@@ -50,7 +50,7 @@ pub struct ComponentInstanceResource {
 #[rustler::resource_impl()]
 impl rustler::Resource for ComponentInstanceResource {}
 
-#[rustler::nif(name = "component_instance_new", schedule = "DirtyCpu")]
+#[rustler::nif(name = "component_instance_new")]
 pub fn new_instance(
     store_resource: ResourceArc<ComponentStoreResource>,
     component_resource: ResourceArc<ComponentResource>,
@@ -355,7 +355,7 @@ fn component_execute_function(
     thread_env.save(result)
 }
 
-#[rustler::nif(name = "component_receive_callback_result", schedule = "DirtyCpu")]
+#[rustler::nif(name = "component_receive_callback_result")]
 pub fn receive_callback_result(
     component_resource: ResourceArc<ComponentResource>,
     token_resource: ResourceArc<ComponentCallbackTokenResource>,

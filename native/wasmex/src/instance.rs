@@ -40,7 +40,7 @@ impl rustler::Resource for InstanceResource {}
 // * module (ModuleResource): the compiled Wasm module
 // * imports (map): a map defining eventual instance imports, may be empty if there are none.
 //   structure: %{namespace_name: %{import_name: {:fn, param_types, result_types, captured_function}}}
-#[rustler::nif(name = "instance_new", schedule = "DirtyCpu")]
+#[rustler::nif(name = "instance_new")]
 pub fn new(
     store_or_caller_resource: ResourceArc<StoreOrCallerResource>,
     module_resource: ResourceArc<ModuleResource>,
@@ -479,7 +479,7 @@ pub fn map_wasm_values_to_vals(values: &[WasmValue]) -> Vec<Val> {
 //   indicates whether the call was successful or produced an elixir-error
 // * results: [number]
 //   return values of the elixir-callback - empty list when success-type is :error
-#[rustler::nif(name = "instance_receive_callback_result", schedule = "DirtyCpu")]
+#[rustler::nif(name = "instance_receive_callback_result")]
 pub fn receive_callback_result(
     token_resource: ResourceArc<CallbackTokenResource>,
     success: bool,
