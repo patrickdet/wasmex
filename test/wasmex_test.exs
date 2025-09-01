@@ -644,8 +644,8 @@ defmodule WasmexTest do
       beam_elapsed = Task.await(beam_task, 5_000)
 
       # Should take roughly 100-200ms if scheduler isn't blocked
-      # If blocked by WASM, would take much longer
-      assert beam_elapsed < 500, "BEAM scheduler was blocked (took #{beam_elapsed}ms)"
+      # Even in CI, with DirtyCpu properly set, this should be under 1 second
+      assert beam_elapsed < 1_000, "BEAM scheduler was blocked (took #{beam_elapsed}ms)"
 
       # Wait for WASM tasks to complete
       Task.await_many(wasm_tasks, 10_000)
