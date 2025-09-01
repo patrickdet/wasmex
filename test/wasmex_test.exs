@@ -278,13 +278,10 @@ defmodule WasmexTest do
       {:ok, module} = Wasmex.Module.compile(store, bytes)
       {:ok, pid} = Wasmex.start_link(%{store: store, module: module})
 
-      err_msg =
-        assert_raise RuntimeError, fn ->
-          Wasmex.call_function(pid, :divide, [1, 0])
-        end
+      assert {:error, err_msg} = Wasmex.call_function(pid, :divide, [1, 0])
 
       assert String.starts_with?(
-               err_msg.message,
+               err_msg,
                "Error during function excecution (wasm trap: wasm `unreachable` instruction executed): error while executing at wasm backtrace:"
              )
     end
@@ -300,13 +297,10 @@ defmodule WasmexTest do
       {:ok, module} = Wasmex.Module.compile(store, bytes)
       {:ok, pid} = Wasmex.start_link(%{store: store, module: module})
 
-      err_msg =
-        assert_raise RuntimeError, fn ->
-          Wasmex.call_function(pid, :divide, [1, 0])
-        end
+      assert {:error, reason} = Wasmex.call_function(pid, :divide, [1, 0])
 
       # contains source file and line number
-      assert err_msg.message =~ "wasm_test/src/lib.rs:75:5"
+      assert reason =~ "wasm_test/src/lib.rs:75:5"
     end
   end
 
@@ -321,12 +315,9 @@ defmodule WasmexTest do
       assert Wasmex.call_function(pid, :void, []) == {:ok, nil}
       assert Wasmex.StoreOrCaller.get_fuel(store) == {:ok, 1}
 
-      err_msg =
-        assert_raise RuntimeError, fn ->
-          Wasmex.call_function(pid, :void, [])
-        end
+      assert {:error, err_msg} = Wasmex.call_function(pid, :void, [])
 
-      assert err_msg.message =~
+      assert err_msg =~
                ~r/Error during function excecution \(wasm trap: all fuel consumed by WebAssembly\): error while executing at wasm backtrace:\n.+0:.+0x.+ - .*\!void/
     end
   end
@@ -743,11 +734,9 @@ defmodule WasmexTest do
       tasks =
         for i <- 1..100 do
           Task.async(fn ->
-            try do
-              {:ok, [result]} = Wasmex.call_function(pid, :may_fail, [i])
-              {:success, result}
-            rescue
-              RuntimeError -> {:failed, i}
+            case Wasmex.call_function(pid, :may_fail, [i]) do
+              {:ok, [result]} -> {:success, result}
+              {:error, _reason} -> {:failed, i}
             end
           end)
         end
@@ -778,9 +767,8 @@ defmodule WasmexTest do
 
       {:ok, pid} = Wasmex.start_link(%{bytes: wat})
 
-      assert_raise RuntimeError, ~r/unreachable/, fn ->
-        Wasmex.call_function(pid, :trap, [])
-      end
+      assert {:error, err_msg} = Wasmex.call_function(pid, :trap, [])
+      assert err_msg =~ ~r/unreachable/
     end
 
     test "function with wrong parameters returns error" do
@@ -831,9 +819,8 @@ defmodule WasmexTest do
 
       {:ok, pid} = Wasmex.start_link(%{bytes: wat})
 
-      assert_raise RuntimeError, ~r/div(ide|ision) by zero/, fn ->
-        Wasmex.call_function(pid, :divide, [10, 0])
-      end
+      assert {:error, err_msg} = Wasmex.call_function(pid, :divide, [10, 0])
+      assert err_msg =~ ~r/div(ide|ision) by zero/
     end
   end
 end

@@ -250,10 +250,7 @@ defmodule Wasmex.Components do
   @spec call_function(pid(), function_name_or_path(), list(number()), pos_integer()) ::
           {:ok, list(number())} | {:error, any()}
   def call_function(pid, name_or_path, params, timeout \\ 5000) do
-    case GenServer.call(pid, {:call_function, name_or_path, params}, timeout) do
-      {:raise, reason} -> raise reason
-      result -> result
-    end
+    GenServer.call(pid, {:call_function, name_or_path, params}, timeout)
   end
 
   @impl true

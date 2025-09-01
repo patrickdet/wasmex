@@ -342,14 +342,9 @@ fn component_execute_function(
             Err(err) => {
                 let reason = format!("{err}");
                 if let Ok(trap) = err.downcast::<Trap>() {
-                    make_tuple(
-                        env,
-                        &[
-                            atoms::raise().encode(env),
-                            format!("Error during function excecution ({trap}): {reason}")
-                                .encode(env),
-                        ],
-                    )
+                    env.error_tuple(format!(
+                        "Error during function excecution ({trap}): {reason}"
+                    ))
                 } else {
                     env.error_tuple(format!("Error during function excecution: {reason}"))
                 }
