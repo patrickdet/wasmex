@@ -515,7 +515,7 @@ pub fn convert_params(param_types: &[Type], param_terms: Vec<Term>) -> Result<Ve
     Ok(params)
 }
 
-pub fn encode_result_async<'a>(env: rustler::Env<'a>, vals: Vec<Val>) -> Term<'a> {
+pub fn encode_result<'a>(env: rustler::Env<'a>, vals: Vec<Val>) -> Term<'a> {
     let result_term = match vals.len() {
         1 => val_to_term(vals.first().unwrap(), env, vec![]),
         _ => vals

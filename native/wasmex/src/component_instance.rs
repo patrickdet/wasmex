@@ -26,7 +26,7 @@ use wasmtime_wasi;
 use wasmtime_wasi_http;
 
 use crate::component_type_conversion::{
-    convert_params, convert_result_term, encode_result_async, vals_to_terms,
+    convert_params, convert_result_term, encode_result, vals_to_terms,
 };
 
 pub struct ComponentCallbackToken {
@@ -337,7 +337,7 @@ fn component_execute_function(
         ) {
             Ok(_) => {
                 let _ = function.post_return(&mut *component_store);
-                encode_result_async(env, result)
+                encode_result(env, result)
             }
             Err(err) => {
                 let reason = format!("{err}");
