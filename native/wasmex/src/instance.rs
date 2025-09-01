@@ -216,7 +216,7 @@ pub fn call_exported_function(
     from: Term,
 ) -> rustler::Atom {
     let _ = env; // Required by rustler macro, but we use OwnedEnv instead
-    // create erlang environment for the thread
+                 // create erlang environment for the thread
     let mut thread_env = OwnedEnv::new();
     // copy over params into the thread environment
     let function_params = thread_env.save(params);
