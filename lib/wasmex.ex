@@ -404,7 +404,10 @@ defmodule Wasmex do
   @spec call_function(pid(), String.t() | atom(), list(number()), pos_integer()) ::
           {:ok, list(number())} | {:error, any()}
   def call_function(pid, name, params, timeout \\ 5000) do
-    GenServer.call(pid, {:call_function, Wasmex.Utils.stringify(name), params}, timeout)
+    case GenServer.call(pid, {:call_function, Wasmex.Utils.stringify(name), params}, timeout) do
+      {:raise, reason} -> raise reason
+      result -> result
+    end
   end
 
   @doc ~S"""

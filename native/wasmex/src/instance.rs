@@ -303,14 +303,18 @@ fn execute_function(
             Err(err) => {
                 let reason = format!("{err}");
                 if let Ok(trap) = err.downcast::<Trap>() {
-                    return env
-                        .error_tuple(&format!(
-                            "Error during function excecution ({trap}): {reason}"
-                        ))
-                        .encode(env);
+                    return make_tuple(
+                        env,
+                        &[
+                            atoms::raise().encode(env),
+                            format!("Error during function excecution ({trap}): {reason}")
+                                .encode(env),
+                        ],
+                    )
+                    .encode(env);
                 } else {
                     return env
-                        .error_tuple(&format!("Error during function excecution: {reason}"))
+                        .error_tuple(format!("Error during function excecution: {reason}"))
                         .encode(env);
                 }
             }

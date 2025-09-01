@@ -350,16 +350,8 @@ fn component_execute_function(
                                 .encode(env),
                         ],
                     )
-                    .encode(env)
                 } else {
-                    make_tuple(
-                        env,
-                        &[
-                            atoms::raise().encode(env),
-                            format!("Error during function excecution: {reason}").encode(env),
-                        ],
-                    )
-                    .encode(env)
+                    env.error_tuple(format!("Error during function excecution: {reason}"))
                 }
             }
         }
