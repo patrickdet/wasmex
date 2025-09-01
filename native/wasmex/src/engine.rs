@@ -60,7 +60,7 @@ pub fn new(
     Ok(resource)
 }
 
-#[rustler::nif(name = "engine_precompile_module")]
+#[rustler::nif(name = "engine_precompile_module", schedule = "DirtyCpu")]
 pub fn precompile_module<'a>(
     env: rustler::Env<'a>,
     engine_resource: ResourceArc<EngineResource>,
