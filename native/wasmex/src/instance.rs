@@ -215,7 +215,7 @@ pub fn call_exported_function(
     params: Term,
     from: Term,
 ) -> rustler::Atom {
-    let pid = env.pid();
+    let _ = env; // Required by rustler macro, but we use OwnedEnv instead
     // create erlang environment for the thread
     let mut thread_env = OwnedEnv::new();
     // copy over params into the thread environment
@@ -232,31 +232,21 @@ pub fn call_exported_function(
             function_params,
         );
 
-        // Check if from is a GenServer tuple for direct reply
+        // Send GenServer reply directly to the caller
         thread_env.run(|env| {
-            let from_term = from.load(env).decode::<Term>().unwrap();
+            let from_tuple = from.load(env).decode::<Term>().unwrap();
             let result_term = result
                 .load(env)
                 .decode::<Term>()
                 .unwrap_or(atoms::error().encode(env));
 
-            // Try to decode from as GenServer tuple {pid, ref} for direct reply
-            if let Ok((caller_pid, ref_term)) = from_term.decode::<(LocalPid, Term)>() {
-                // Send GenServer reply format directly to caller: {ref, result}
-                let _ = env.send(&caller_pid, make_tuple(env, &[ref_term, result_term]));
-            } else {
-                // Fall back to old-style message for tests and other uses
-                // Send {:returned_function_call, result, from} to the calling process
-                let message = make_tuple(
-                    env,
-                    &[
-                        atoms::returned_function_call().encode(env),
-                        result_term,
-                        from_term,
-                    ],
-                );
-                let _ = env.send(&pid, message);
-            }
+            // GenServer.call from tuple is {pid, ref}
+            let (caller_pid, ref_term) = from_tuple
+                .decode::<(LocalPid, Term)>()
+                .expect("from must be a GenServer {pid, ref} tuple");
+
+            // Send GenServer reply format directly to caller: {ref, result}
+            let _ = env.send(&caller_pid, make_tuple(env, &[ref_term, result_term]));
         });
     });
 

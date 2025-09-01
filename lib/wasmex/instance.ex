@@ -138,17 +138,6 @@ defmodule Wasmex.Instance do
   You can pass arbitrary data to WebAssembly by writing that data into an instances `Wasmex.Memory`.
   The `memory/2` function returns the instances memory.
 
-  ## Example
-
-      iex> %{store: store, module: module} = TestHelper.wasm_module()
-      iex> {:ok, instance} = Wasmex.Instance.new(store, module, %{})
-      iex> Wasmex.Instance.call_exported_function(store, instance, "sum", [1, 2], :from)
-      :ok
-      iex> receive do
-      ...>   {:returned_function_call, {:ok, [3]}, :from} -> :ok
-      ...> after
-      ...>  1000 -> raise "message_expected"
-      ...> end
   """
   @spec call_exported_function(
           Wasmex.StoreOrCaller.t(),
