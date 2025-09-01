@@ -206,7 +206,7 @@ pub fn function_export_exists(
     Ok(result)
 }
 
-#[rustler::nif(name = "instance_call_exported_function", schedule = "DirtyCpu")]
+#[rustler::nif(name = "instance_call_exported_function")]
 pub fn call_exported_function(
     env: rustler::Env,
     store_or_caller_resource: ResourceArc<StoreOrCallerResource>,

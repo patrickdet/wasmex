@@ -182,7 +182,7 @@ fn link_import(
         .map_err(|e| rustler::Error::Term(Box::new(e.to_string())))
 }
 
-#[rustler::nif(name = "component_call_function", schedule = "DirtyCpu")]
+#[rustler::nif(name = "component_call_function")]
 pub fn call_exported_function(
     env: rustler::Env,
     component_store_resource: ResourceArc<ComponentStoreResource>,
