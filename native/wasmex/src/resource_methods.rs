@@ -13,6 +13,7 @@ use rustler::types::tuple::make_tuple;
 
 /// Call a method on a resource
 #[rustler::nif(name = "resource_call_method", schedule = "DirtyCpu")]
+#[allow(clippy::too_many_arguments)]
 pub fn resource_call_method<'a>(
     env: Env<'a>,
     store_resource: ResourceArc<ComponentStoreResource>,
@@ -47,6 +48,7 @@ pub fn resource_call_method<'a>(
     atoms::ok().encode(env)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn execute_resource_method(
     env: Env,
     store_resource: ResourceArc<ComponentStoreResource>,
@@ -342,7 +344,7 @@ fn execute_resource_constructor(
 
     // Find the constructor function
     let constructor_name = format!("[constructor]{}", resource_name);
-    let function = match lookup_constructor(&instance, &mut *store, &interface_path, &constructor_name) {
+    let function = match lookup_constructor(&instance, &mut store, &interface_path, &constructor_name) {
         Ok(func) => func,
         Err(err) => {
             let error_tuple = env.error_tuple(err);
@@ -418,7 +420,7 @@ fn execute_resource_constructor(
             }
 
             let resource_any = match &results[0] {
-                Val::Resource(r) => r.clone(),
+                Val::Resource(r) => *r,
                 _ => {
                     let error_msg = "Constructor did not return a resource".to_string();
                     let error_tuple = env.error_tuple(error_msg);
