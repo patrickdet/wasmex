@@ -1,8 +1,12 @@
-defmodule Wasmex.Components.ResourceFinalTest do
+defmodule Wasmex.Components.HostResourcePatternsTest do
   use ExUnit.Case, async: true
 
   @moduledoc """
-  Final tests showing the clean, working resource API.
+  Tests demonstrating common patterns for implementing host resources
+  that can be exposed to WebAssembly components.
+  
+  These examples show how to create Elixir GenServers that act as resources
+  for WASM components to interact with host capabilities.
   """
 
   describe "Host Resources (90% of use cases)" do
