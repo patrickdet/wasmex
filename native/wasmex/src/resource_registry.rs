@@ -66,8 +66,6 @@ mod tests {
     #[test]
     fn test_resource_registration() {
         let registry = ResourceRegistry::new(1);
-
-        // TODO: Add actual tests once we can create test resources
         assert_eq!(registry.count_active_resources(), 0);
     }
 
