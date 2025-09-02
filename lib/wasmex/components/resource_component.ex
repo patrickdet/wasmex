@@ -11,27 +11,33 @@ defmodule Wasmex.Components.ResourceComponent do
   ## Basic Usage
 
   ```elixir
-  defmodule MyApp.DatabaseResource do
+  defmodule MyApp.CounterResource do
     use Wasmex.Components.ResourceComponent,
-      wit: "path/to/database.wit",
-      resource: "database-connection"
+      wit: "path/to/counter.wit",
+      resource: "counter"
     
     @impl true
-    def init(connection_string) do
-      # Initialize your resource
-      {:ok, %{conn: connect(connection_string)}}
+    def init(initial_value) do
+      # Initialize your resource state
+      {:ok, %{value: initial_value}}
     end
     
     @impl true
-    def handle_method("query", [sql], state) do
-      result = execute_query(state.conn, sql)
-      {:reply, result, state}
+    def handle_method("increment", [], state) do
+      new_value = state.value + 1
+      {:reply, new_value, %{state | value: new_value}}
+    end
+    
+    @impl true
+    def handle_method("get-value", [], state) do
+      {:reply, state.value, state}
     end
   end
 
   # Start and use the resource
-  {:ok, pid} = MyApp.DatabaseResource.start_link("postgres://...")
-  result = MyApp.DatabaseResource.query(pid, "SELECT * FROM users")
+  {:ok, pid} = MyApp.CounterResource.start_link(42)
+  new_value = MyApp.CounterResource.increment(pid)  # Returns 43
+  current = MyApp.CounterResource.get_value(pid)    # Returns 43
   ```
 
   ## With WASM Components
