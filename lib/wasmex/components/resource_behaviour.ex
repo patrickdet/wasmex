@@ -70,8 +70,8 @@ defmodule Wasmex.Components.ResourceBehaviour do
         end
 
         @impl true
-        def handle_method(method, _params, state) do
-          {:error, "Unknown method: \#{method}", state}
+        def handle_method(_method, _params, state) do
+          {:error, "Unknown method", state}
         end
 
         @impl true

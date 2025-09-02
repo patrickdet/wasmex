@@ -60,10 +60,16 @@ defmodule Wasmex.Components.ResourceComponentServer do
   # Start the resource
   {:ok, pid} = MyApp.Counter.start_link(42)
 
-  # Generated method wrappers
-  MyApp.Counter.increment(pid)    # Returns: 43
-  MyApp.Counter.get_value(pid)    # Returns: 43
-  MyApp.Counter.reset(pid, 0)     # Returns: :ok
+  # Generated method wrappers return {:ok, result} or {:error, reason}
+  {:ok, 43} = MyApp.Counter.increment(pid)
+  {:ok, 43} = MyApp.Counter.get_value(pid)
+  {:ok, nil} = MyApp.Counter.reset(pid, 0)
+  
+  # Error handling
+  case MyApp.Counter.increment(pid) do
+    {:ok, new_value} -> IO.puts("Incremented to \#{new_value}")
+    {:error, reason} -> IO.puts("Failed: \#{reason}")
+  end
   ```
 
   ## Options
@@ -149,10 +155,7 @@ defmodule Wasmex.Components.ResourceComponentServer do
 
           # Internal helper for method calls
           defp call_method(pid, method, params, timeout \\ 5000) do
-            case GenServer.call(pid, {:method, method, params}, timeout) do
-              {:ok, result} -> result
-              {:error, reason} -> raise "Resource method #{method} failed: #{reason}"
-            end
+            GenServer.call(pid, {:method, method, params}, timeout)
           end
         end
 

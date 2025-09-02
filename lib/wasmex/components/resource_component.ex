@@ -36,8 +36,16 @@ defmodule Wasmex.Components.ResourceComponent do
 
   # Start and use the resource
   {:ok, pid} = MyApp.CounterResource.start_link(42)
-  new_value = MyApp.CounterResource.increment(pid)  # Returns 43
-  current = MyApp.CounterResource.get_value(pid)    # Returns 43
+  
+  # Methods return {:ok, result} or {:error, reason}
+  {:ok, 43} = MyApp.CounterResource.increment(pid)
+  {:ok, 43} = MyApp.CounterResource.get_value(pid)
+  
+  # Error handling
+  case MyApp.CounterResource.increment(pid) do
+    {:ok, new_value} -> IO.puts("New value: \#{new_value}")
+    {:error, reason} -> IO.puts("Failed: \#{reason}")
+  end
   ```
 
   ## With WASM Components
@@ -187,10 +195,7 @@ defmodule Wasmex.Components.ResourceComponent do
         end
 
         defp call_method_internal(pid, method, params, timeout \\ 5000) do
-          case GenServer.call(pid, {:method, method, params}, timeout) do
-            {:ok, result} -> result
-            {:error, reason} -> raise "Resource method #{method} failed: #{reason}"
-          end
+          GenServer.call(pid, {:method, method, params}, timeout)
         end
 
         # Optional callbacks

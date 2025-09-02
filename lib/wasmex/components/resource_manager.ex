@@ -289,8 +289,6 @@ defmodule Wasmex.Components.ResourceManager do
   # Helper functions
 
   defp get_store_id(store) do
-    # Extract the store ID from the store reference
-    # This matches the original implementation
     :erlang.phash2(store)
   end
 

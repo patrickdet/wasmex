@@ -64,12 +64,6 @@ defmodule Wasmex.Components.ResourceServer do
         shutdown: 10_000
       )
 
-  ## Restart Strategies
-
-  - `:permanent` - Always restart (database connections, critical services)
-  - `:transient` - Restart only on abnormal exit (most WASM resources)
-  - `:temporary` - Never restart (ephemeral resources, temp files)
-
   The resource's `terminate/2` callback is always called for cleanup, regardless
   of restart strategy.
   """
