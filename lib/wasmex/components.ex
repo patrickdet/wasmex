@@ -197,21 +197,6 @@ defmodule Wasmex.Components do
   - Resources are automatically cleaned up when the store is dropped
   - Resources can be passed as arguments to functions and returned from functions
 
-  ### Legacy Factory Functions
-
-  Some components may also expose factory functions to create resources.
-  While these work, using constructors directly is the recommended approach:
-
-  ```elixir
-  # Legacy approach - factory function
-  :ok = Wasmex.Components.Instance.call_function(
-    instance,
-    ["component:counter/types", "make-counter"],
-    [42],
-    from
-  )
-  ```
-
   Support for the Component Model, including resources, should be considered beta quality.
 
   ## Options
