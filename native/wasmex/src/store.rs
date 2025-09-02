@@ -290,19 +290,25 @@ pub fn component_store_new_wasi(
         // Add preopen directories if specified
         if let Some(preopen_dirs) = &options.preopen_dirs {
             for dir in preopen_dirs {
-                // Preopen the directory with "." as the guest path
-                // This allows the guest to access files using relative paths
+                // Extract the last component of the path to use as the guest path
+                // e.g., "/tmp/sandbox/input" -> "input"
+                // This allows multiple directories to be preopened with distinct names
+                let guest_path = std::path::Path::new(dir)
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or(".");
+
                 wasi_ctx_builder
                     .preopened_dir(
                         dir,
-                        ".",
+                        guest_path,
                         wasmtime_wasi::DirPerms::all(),
                         wasmtime_wasi::FilePerms::all(),
                     )
                     .map_err(|e| {
                         rustler::Error::Term(Box::new(format!(
-                            "Failed to preopen directory {}: {}",
-                            dir, e
+                            "Failed to preopen directory {} as {}: {}",
+                            dir, guest_path, e
                         )))
                     })?;
             }

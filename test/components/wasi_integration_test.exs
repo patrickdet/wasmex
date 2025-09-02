@@ -12,7 +12,10 @@ defmodule Wasmex.Components.WasiIntegrationTest do
   describe "WASI filesystem operations" do
     setup do
       temp_dir = System.tmp_dir!()
-      test_dir = Path.join(temp_dir, "wasmex_wasi_test_#{:rand.uniform(1_000_000)}")
+      # Use a fixed name so the WASI component knows how to access it
+      # Clean up any previous test run first
+      test_dir = Path.join(temp_dir, "wasi_test")
+      File.rm_rf(test_dir)
       File.mkdir_p!(test_dir)
 
       on_exit(fn ->
@@ -34,15 +37,7 @@ defmodule Wasmex.Components.WasiIntegrationTest do
       {:ok, component} = Component.new(store, component_bytes)
       {:ok, instance} = Instance.new(store, component, %{})
 
-      # Change to the test directory for relative path operations
-      original_dir = File.cwd!()
-      File.cd!(test_dir)
-
-      on_exit(fn ->
-        File.cd!(original_dir)
-      end)
-
-      {:ok, instance: instance, test_dir: test_dir}
+      {:ok, instance: instance, test_dir: test_dir, guest_dir: "wasi_test"}
     end
 
     test "can write and read files", %{instance: instance} do

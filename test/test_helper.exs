@@ -158,14 +158,6 @@ defmodule TestHelper do
         System.cmd("sh", ["build.sh"], cd: filesystem_dir, stderr_to_stdout: true, into: [])
     end
 
-    # Build network-component
-    network_dir = "#{component_fixtures_dir}/network-component"
-
-    if File.exists?(network_dir) do
-      {_output, _code} =
-        System.cmd("sh", ["build.sh"], cd: network_dir, stderr_to_stdout: true, into: [])
-    end
-
     # Build wasi-test-component
     wasi_test_dir = "#{component_fixtures_dir}/wasi-test-component"
 

@@ -17,7 +17,6 @@ defmodule Mix.Tasks.Wasmex.BuildFixtures do
 
   @fixtures [
     "counter-component",
-    "network-component",
     "filesystem-component",
     "wasi-test-component"
   ]

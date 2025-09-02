@@ -1,535 +1,319 @@
 defmodule Wasmex.Components.FilesystemResourceTest do
+  # Can't be async - filesystem conflicts
   use ExUnit.Case, async: false
-  import ExUnit.CaptureLog
 
-  alias Wasmex.Components
+  alias Wasmex.Test.FilesystemSandbox
   alias Wasmex.Wasi.WasiP2Options
+  alias Wasmex.Components.{Store, Component, Instance}
 
-  @moduletag :filesystem_resources
-  @moduletag timeout: :infinity
+  setup do
+    # Create isolated sandbox for this test
+    sandbox_dir = FilesystemSandbox.setup()
 
-  @filesystem_component_path "test/component_fixtures/filesystem-component/target/wasm32-wasip1/release/filesystem_component.wasm"
-
-  describe "filesystem resources" do
-    setup do
-      # Ensure the component is built
-      unless File.exists?(@filesystem_component_path) do
-        build_cmd =
-          "cd test/component_fixtures/filesystem-component && cargo component build --release"
-
-        {_, 0} = System.cmd("sh", ["-c", build_cmd], stderr_to_stdout: true)
-      end
-
-      # Create a store with WASI support
-      wasi_options = %WasiP2Options{
-        args: [],
-        env: %{},
-        inherit_stdin: true,
+    # Create store with real filesystem access
+    {:ok, store} =
+      Store.new_wasi(%WasiP2Options{
+        preopen_dirs: [
+          Path.join(sandbox_dir, "input"),
+          Path.join(sandbox_dir, "output"),
+          Path.join(sandbox_dir, "work")
+        ],
+        # See WASI errors
         inherit_stdout: true,
         inherit_stderr: true
-      }
-
-      {:ok, store} = Components.Store.new_wasi(wasi_options)
-      {:ok, component} = Components.Component.new(store, File.read!(@filesystem_component_path))
-      {:ok, instance} = Components.Instance.new(store, component, %{})
-
-      %{store: store, instance: instance}
-    end
-
-    test "file handle resource lifecycle", %{instance: instance} do
-      from = self()
-
-      # Create a directory
-      :ok =
-        Components.Instance.call_function(
-          instance,
-          ["test:filesystem/types", "create-test-directory"],
-          [],
-          from
-        )
-
-      assert_receive {:returned_function_call, {:ok, directory}, ^from},
-                     5000,
-                     "Timeout creating directory"
-
-      # Create multiple file handles
-      files =
-        for i <- 1..3 do
-          filename = "file#{i}.txt"
-
-          :ok =
-            Components.Instance.call_function(
-              instance,
-              ["test:filesystem/types", "[method]directory.create-file"],
-              [directory, filename],
-              from
-            )
-
-          assert_receive {:returned_function_call, {:ok, result}, ^from},
-                         5000,
-                         "Timeout creating file #{filename}"
-
-          case result do
-            {:ok, file} -> {filename, file}
-            {:error, error} -> flunk("Error creating file #{filename}: #{error}")
-          end
-        end
-
-      assert length(files) == 3
-
-      # Verify all file handles are valid resources
-      for {_name, file} <- files do
-        assert is_reference(file)
-      end
-
-      # Write to each file
-      for {name, file} <- files do
-        data = "Content of #{name}"
-        bytes = :erlang.binary_to_list(data)
-
-        :ok =
-          Components.Instance.call_function(
-            instance,
-            ["test:filesystem/types", "[method]file-handle.write"],
-            [file, bytes],
-            from
-          )
-
-        assert_receive {:returned_function_call, {:ok, result}, ^from},
-                       5000,
-                       "Timeout writing to #{name}"
-
-        case result do
-          {:ok, written} -> assert written == byte_size(data)
-          {:error, error} -> flunk("Error writing to #{name}: #{error}")
-        end
-      end
-    end
-
-    test "concurrent file handle operations", %{instance: instance} do
-      from = self()
-
-      # Create a directory
-      :ok =
-        Components.Instance.call_function(
-          instance,
-          ["test:filesystem/types", "create-test-directory"],
-          [],
-          from
-        )
-
-      assert_receive {:returned_function_call, {:ok, directory}, ^from},
-                     5000,
-                     "Timeout creating directory"
-
-      # Create a file handle
-      :ok =
-        Components.Instance.call_function(
-          instance,
-          ["test:filesystem/types", "[method]directory.create-file"],
-          [directory, "concurrent.txt"],
-          from
-        )
-
-      assert_receive {:returned_function_call, {:ok, {:ok, file_handle}}, ^from},
-                     5000,
-                     "Timeout creating file"
-
-      # Simulate concurrent writes (not truly concurrent but sequential)
-      writes =
-        for i <- 1..10 do
-          data = "Line #{i}\n"
-          bytes = :erlang.binary_to_list(data)
-
-          :ok =
-            Components.Instance.call_function(
-              instance,
-              ["test:filesystem/types", "[method]file-handle.write"],
-              [file_handle, bytes],
-              from
-            )
-
-          assert_receive {:returned_function_call, {:ok, {:ok, written}}, ^from}, 1000
-          {:ok, written}
-        end
-
-      assert Enum.all?(writes, fn
-               {:ok, _} -> true
-               _ -> false
-             end)
-    end
-
-    test "directory operations", %{instance: instance} do
-      from = self()
-
-      # Create a directory
-      :ok =
-        Components.Instance.call_function(
-          instance,
-          ["test:filesystem/types", "create-test-directory"],
-          [],
-          from
-        )
-
-      assert_receive {:returned_function_call, {:ok, directory}, ^from},
-                     5000,
-                     "Timeout creating directory"
-
-      # Create multiple files
-      filenames = ["doc1.txt", "doc2.txt", "image.png", "data.json"]
-
-      for name <- filenames do
-        :ok =
-          Components.Instance.call_function(
-            instance,
-            ["test:filesystem/types", "[method]directory.create-file"],
-            [directory, name],
-            from
-          )
-
-        assert_receive {:returned_function_call, {:ok, {:ok, _}}, ^from},
-                       5000,
-                       "Timeout creating file #{name}"
-      end
-
-      # List files
-      :ok =
-        Components.Instance.call_function(
-          instance,
-          ["test:filesystem/types", "[method]directory.list-files"],
-          [directory],
-          from
-        )
-
-      assert_receive {:returned_function_call, {:ok, file_list}, ^from},
-                     5000,
-                     "Timeout listing files"
-
-      assert is_list(file_list)
-      assert length(file_list) == length(filenames)
-
-      for name <- filenames do
-        assert name in file_list
-      end
-    end
-
-    test "file position tracking", %{instance: instance} do
-      from = self()
-
-      # Create a directory and file
-      :ok =
-        Components.Instance.call_function(
-          instance,
-          ["test:filesystem/types", "create-test-directory"],
-          [],
-          from
-        )
-
-      assert_receive {:returned_function_call, {:ok, directory}, ^from},
-                     5000,
-                     "Timeout creating directory"
-
-      :ok =
-        Components.Instance.call_function(
-          instance,
-          ["test:filesystem/types", "[method]directory.create-file"],
-          [directory, "position.txt"],
-          from
-        )
-
-      assert_receive {:returned_function_call, {:ok, {:ok, file}}, ^from},
-                     5000,
-                     "Timeout creating file"
-
-      # Write data in chunks
-      chunks = ["First chunk. ", "Second chunk. ", "Third chunk."]
-
-      written_sizes =
-        for chunk <- chunks do
-          bytes = :erlang.binary_to_list(chunk)
-
-          :ok =
-            Components.Instance.call_function(
-              instance,
-              ["test:filesystem/types", "[method]file-handle.write"],
-              [file, bytes],
-              from
-            )
-
-          assert_receive {:returned_function_call, {:ok, {:ok, written}}, ^from},
-                         5000,
-                         "Timeout writing chunk"
-
-          assert written == byte_size(chunk)
-          written
-        end
-
-      # The file position should have advanced
-      total_written = Enum.sum(written_sizes)
-      assert total_written == Enum.sum(Enum.map(chunks, &byte_size/1))
-    end
-
-    test "file handle cleanup", %{instance: instance} do
-      from = self()
-
-      # Create a directory
-      :ok =
-        Components.Instance.call_function(
-          instance,
-          ["test:filesystem/types", "create-test-directory"],
-          [],
-          from
-        )
-
-      assert_receive {:returned_function_call, {:ok, directory}, ^from},
-                     5000,
-                     "Timeout creating directory"
-
-      # Create a file
-      :ok =
-        Components.Instance.call_function(
-          instance,
-          ["test:filesystem/types", "[method]directory.create-file"],
-          [directory, "cleanup.txt"],
-          from
-        )
-
-      assert_receive {:returned_function_call, {:ok, {:ok, file}}, ^from},
-                     5000,
-                     "Timeout creating file"
-
-      # Close the file handle
-      :ok =
-        Components.Instance.call_function(
-          instance,
-          ["test:filesystem/types", "[method]file-handle.close"],
-          [file],
-          from
-        )
-
-      assert_receive {:returned_function_call, {:ok, _}, ^from}, 5000, "Timeout closing file"
-    end
-
-    test "bulk file operations", %{instance: instance} do
-      from = self()
-      num_files = 50
-
-      log =
-        capture_log(fn ->
-          # Create a directory
-          :ok =
-            Components.Instance.call_function(
-              instance,
-              ["test:filesystem/types", "create-test-directory"],
-              [],
-              from
-            )
-
-          assert_receive {:returned_function_call, {:ok, directory}, ^from}, 5000
-
-          # Create many files
-          files =
-            for i <- 1..num_files do
-              filename = "bulk_file_#{i}.txt"
-
-              :ok =
-                Components.Instance.call_function(
-                  instance,
-                  ["test:filesystem/types", "[method]directory.create-file"],
-                  [directory, filename],
-                  from
-                )
-
-              # Use a short timeout and handle timeout gracefully
-              receive do
-                {:returned_function_call, {:ok, {:ok, f}}, ^from} -> f
-              after
-                1000 -> nil
-              end
-            end
-
-          # Remove nils and verify we created files
-          valid_files = Enum.filter(files, & &1)
-          assert length(valid_files) > 0
-
-          # Write to and close each file
-          for file <- valid_files do
-            # Write some data
-            bytes = :erlang.binary_to_list("test data")
-
-            :ok =
-              Components.Instance.call_function(
-                instance,
-                ["test:filesystem/types", "[method]file-handle.write"],
-                [file, bytes],
-                from
-              )
-
-            # Short timeout for bulk operations
-            receive do
-              {:returned_function_call, {:ok, _}, ^from} -> :ok
-            after
-              500 -> :ok
-            end
-
-            # Close the file
-            :ok =
-              Components.Instance.call_function(
-                instance,
-                ["test:filesystem/types", "[method]file-handle.close"],
-                [file],
-                from
-              )
-
-            # Short timeout for bulk operations
-            receive do
-              {:returned_function_call, {:ok, _}, ^from} -> :ok
-            after
-              500 -> :ok
-            end
-          end
-        end)
-
-      # Ensure no memory leak warnings in logs
-      refute log =~ "memory leak"
-      refute log =~ "resource leak"
+      })
+
+    # Load component
+    component_path =
+      "test/component_fixtures/filesystem-component/target/wasm32-wasip2/wasi-release/filesystem_component_final.wasm"
+
+    component_bytes = File.read!(component_path)
+    {:ok, component} = Component.new(store, component_bytes)
+    {:ok, instance} = Instance.new(store, component, %{})
+
+    on_exit(fn -> FilesystemSandbox.cleanup(sandbox_dir) end)
+
+    %{
+      instance: instance,
+      sandbox_dir: sandbox_dir,
+      store: store
+    }
+  end
+
+  # Helper function to call WASM functions synchronously
+  defp call_sync(instance, path, args, timeout \\ 5000) do
+    from = self()
+    :ok = Instance.call_function(instance, path, args, from)
+
+    receive do
+      {:returned_function_call, result, ^from} -> result
+    after
+      timeout -> {:error, :timeout}
     end
   end
 
-  describe "resource lifecycle stress testing" do
-    setup do
-      unless File.exists?(@filesystem_component_path) do
-        build_cmd =
-          "cd test/component_fixtures/filesystem-component && cargo component build --release"
+  # Helper to unwrap Result types from WIT
+  defp unwrap_result(result, error_msg) do
+    case result do
+      # Result<T, String> returns nested ok
+      {:ok, {:ok, value}} -> value
+      {:ok, value} when not is_tuple(value) or elem(value, 0) != :error -> value
+      {:error, _} = error -> flunk("#{error_msg}: #{inspect(error)}")
+      {:ok, {:error, msg}} -> flunk("#{error_msg}: #{msg}")
+      other -> flunk("#{error_msg}: unexpected result #{inspect(other)}")
+    end
+  end
 
-        {_, 0} = System.cmd("sh", ["-c", build_cmd], stderr_to_stdout: true)
-      end
+  describe "filesystem resources with real WASI" do
+    test "real file read/write operations", %{instance: instance, sandbox_dir: sandbox_dir} do
+      # Open the output directory using its mapped name
+      dir =
+        call_sync(instance, ["test:filesystem/types", "open-directory"], ["output"])
+        |> unwrap_result("Failed to open directory")
 
-      %{component_path: @filesystem_component_path}
+      # Create a real file
+      file =
+        call_sync(instance, ["test:filesystem/types", "[method]directory.create-file"], [
+          dir,
+          "test.txt"
+        ])
+        |> unwrap_result("Failed to create file")
+
+      # Write real data
+      data = "Hello from WASI!"
+
+      written =
+        call_sync(instance, ["test:filesystem/types", "[method]file-handle.write"], [
+          file,
+          :erlang.binary_to_list(data)
+        ])
+        |> unwrap_result("Failed to write to file")
+
+      assert written == byte_size(data)
+
+      # Verify file exists on host filesystem
+      host_path = Path.join(sandbox_dir, "output/test.txt")
+      assert File.exists?(host_path)
+      assert File.read!(host_path) == "Hello from WASI!"
+
+      # Clean up file handle
+      call_sync(instance, ["test:filesystem/types", "[method]file-handle.close"], [file])
+      |> unwrap_result("Failed to close file")
     end
 
-    test "repeated store creation and destruction", %{component_path: component_path} do
-      # This simulates opening and closing many files/directories
-      for _iteration <- 1..5 do
-        wasi_options = %WasiP2Options{
-          args: [],
-          env: %{},
-          inherit_stdin: true,
-          inherit_stdout: true,
-          inherit_stderr: true
-        }
+    test "directory listing reflects real filesystem", %{
+      instance: instance,
+      sandbox_dir: sandbox_dir
+    } do
+      # Pre-create files on host
+      work_dir = Path.join(sandbox_dir, "work")
+      File.write!(Path.join(work_dir, "file1.txt"), "content1")
+      File.write!(Path.join(work_dir, "file2.txt"), "content2")
 
-        {:ok, store} = Components.Store.new_wasi(wasi_options)
-        {:ok, component} = Components.Component.new(store, File.read!(component_path))
-        {:ok, instance} = Components.Instance.new(store, component, %{})
+      # Open directory from WASM using mapped name
+      dir =
+        call_sync(instance, ["test:filesystem/types", "open-directory"], ["work"])
+        |> unwrap_result("Failed to open directory")
 
-        from = self()
+      # List should show real files
+      entries =
+        call_sync(instance, ["test:filesystem/types", "[method]directory.list-entries"], [dir])
+        |> unwrap_result("Failed to list directory")
 
-        # Create a directory
-        :ok =
-          Components.Instance.call_function(
-            instance,
-            ["test:filesystem/types", "create-test-directory"],
-            [],
-            from
-          )
-
-        # Short timeout for stress tests
-        directory =
-          receive do
-            {:returned_function_call, {:ok, dir}, ^from} -> dir
-          after
-            1000 -> nil
-          end
-
-        if directory do
-          # Create some files
-          for i <- 1..10 do
-            :ok =
-              Components.Instance.call_function(
-                instance,
-                ["test:filesystem/types", "[method]directory.create-file"],
-                [directory, "file#{i}.txt"],
-                from
-              )
-
-            receive do
-              {:returned_function_call, {:ok, _}, ^from} -> :ok
-            after
-              500 -> :ok
-            end
-          end
-        end
-
-        # Store and resources will be cleaned up when going out of scope
-      end
-
-      # If we get here without crashes or leaks, the test passes
-      assert true
+      assert "file1.txt" in entries
+      assert "file2.txt" in entries
     end
 
-    test "cross-store resource isolation", %{component_path: component_path} do
-      # Create multiple stores with resources
-      stores_and_resources =
-        for i <- 1..3 do
-          wasi_options = %WasiP2Options{
-            args: [],
-            env: %{},
-            inherit_stdin: true,
-            inherit_stdout: true,
-            inherit_stderr: true
-          }
+    test "file operations are isolated between tests", %{
+      instance: instance,
+      sandbox_dir: sandbox_dir
+    } do
+      # Each test has its own sandbox - no conflicts
+      refute File.exists?(Path.join(sandbox_dir, "output/other_test_file.txt"))
 
-          {:ok, store} = Components.Store.new_wasi(wasi_options)
-          {:ok, component} = Components.Component.new(store, File.read!(component_path))
-          {:ok, instance} = Components.Instance.new(store, component, %{})
+      # Create a file in this test's sandbox using mapped name
+      dir =
+        call_sync(instance, ["test:filesystem/types", "open-directory"], ["output"])
+        |> unwrap_result("Failed to open directory")
 
-          from = self()
+      file =
+        call_sync(instance, ["test:filesystem/types", "[method]directory.create-file"], [
+          dir,
+          "isolated_test.txt"
+        ])
+        |> unwrap_result("Failed to create file")
 
-          :ok =
-            Components.Instance.call_function(
-              instance,
-              ["test:filesystem/types", "create-test-directory"],
-              [],
-              from
-            )
+      data = "Isolated content"
 
-          # Short timeout for stress tests
-          directory =
-            receive do
-              {:returned_function_call, {:ok, dir}, ^from} -> dir
-            after
-              1000 -> nil
-            end
+      call_sync(instance, ["test:filesystem/types", "[method]file-handle.write"], [
+        file,
+        :erlang.binary_to_list(data)
+      ])
+      |> unwrap_result("Failed to write to file")
 
-          if directory do
-            # Create a file specific to this store
-            :ok =
-              Components.Instance.call_function(
-                instance,
-                ["test:filesystem/types", "[method]directory.create-file"],
-                [directory, "store_#{i}_file.txt"],
-                from
-              )
+      # Verify it exists in this sandbox
+      assert File.exists?(Path.join(sandbox_dir, "output/isolated_test.txt"))
+    end
 
-            # Short timeout for stress tests
-            file =
-              receive do
-                {:returned_function_call, {:ok, {:ok, f}}, ^from} -> f
-              after
-                1000 -> nil
-              end
+    test "read pre-populated files from input directory", %{
+      instance: instance,
+      sandbox_dir: _sandbox_dir
+    } do
+      # Input directory has pre-populated files from sandbox setup
+      # Use mapped name
+      dir =
+        call_sync(instance, ["test:filesystem/types", "open-directory"], ["input"])
+        |> unwrap_result("Failed to open directory")
 
-            {store, instance, directory, file}
-          else
-            {store, instance, nil, nil}
-          end
+      # Open existing file
+      file =
+        call_sync(instance, ["test:filesystem/types", "[method]directory.open-file"], [
+          dir,
+          "readme.txt"
+        ])
+        |> unwrap_result("Failed to open file")
+
+      # Read content
+      content =
+        call_sync(instance, ["test:filesystem/types", "[method]file-handle.read"], [file, 100])
+        |> unwrap_result("Failed to read file")
+
+      # Convert byte list to string
+      content_str = List.to_string(content)
+      assert content_str == "Test file content"
+    end
+
+    test "seek operations work correctly", %{instance: instance, sandbox_dir: _sandbox_dir} do
+      # Use mapped name
+      dir =
+        call_sync(instance, ["test:filesystem/types", "open-directory"], ["output"])
+        |> unwrap_result("Failed to open directory")
+
+      file =
+        call_sync(instance, ["test:filesystem/types", "[method]directory.create-file"], [
+          dir,
+          "seek_test.txt"
+        ])
+        |> unwrap_result("Failed to create file")
+
+      # Write some data
+      data = "0123456789ABCDEF"
+
+      call_sync(instance, ["test:filesystem/types", "[method]file-handle.write"], [
+        file,
+        :erlang.binary_to_list(data)
+      ])
+      |> unwrap_result("Failed to write to file")
+
+      # Seek to position 5
+      new_pos =
+        call_sync(instance, ["test:filesystem/types", "[method]file-handle.seek"], [file, 5])
+        |> unwrap_result("Failed to seek")
+
+      assert new_pos == 5
+
+      # Read from new position
+      content =
+        call_sync(instance, ["test:filesystem/types", "[method]file-handle.read"], [file, 5])
+        |> unwrap_result("Failed to read after seek")
+
+      content_str = List.to_string(content)
+      assert content_str == "56789"
+    end
+
+    test "delete file operation", %{instance: instance, sandbox_dir: sandbox_dir} do
+      work_dir = Path.join(sandbox_dir, "work")
+
+      # Create a file on host first
+      file_path = Path.join(work_dir, "to_delete.txt")
+      File.write!(file_path, "Delete me")
+      assert File.exists?(file_path)
+
+      # Open directory from WASM using mapped name
+      dir =
+        call_sync(instance, ["test:filesystem/types", "open-directory"], ["work"])
+        |> unwrap_result("Failed to open directory")
+
+      # Delete the file
+      call_sync(instance, ["test:filesystem/types", "[method]directory.delete-file"], [
+        dir,
+        "to_delete.txt"
+      ])
+      |> unwrap_result("Failed to delete file")
+
+      # Verify file is deleted on host
+      refute File.exists?(file_path)
+    end
+
+    test "error handling for non-existent files", %{instance: instance, sandbox_dir: _sandbox_dir} do
+      # Use mapped name
+      dir =
+        call_sync(instance, ["test:filesystem/types", "open-directory"], ["work"])
+        |> unwrap_result("Failed to open directory")
+
+      # Try to open non-existent file
+      result =
+        call_sync(instance, ["test:filesystem/types", "[method]directory.open-file"], [
+          dir,
+          "non_existent.txt"
+        ])
+
+      assert match?({:ok, {:error, _}}, result)
+    end
+
+    test "error handling for non-existent directory", %{
+      instance: instance,
+      sandbox_dir: _sandbox_dir
+    } do
+      # Try to open non-existent directory
+      result =
+        call_sync(instance, ["test:filesystem/types", "open-directory"], ["non_existent_dir"])
+
+      # The open-directory function returns Ok(Directory) even for non-existent dirs
+      # but operations on it will fail
+      assert match?({:ok, _}, result)
+    end
+  end
+
+  describe "resource lifecycle" do
+    test "resources are properly managed", %{instance: instance, sandbox_dir: sandbox_dir} do
+      # Create multiple resources using mapped name
+      dir =
+        call_sync(instance, ["test:filesystem/types", "open-directory"], ["output"])
+        |> unwrap_result("Failed to open directory")
+
+      # Create multiple files
+      files =
+        for i <- 1..5 do
+          file =
+            call_sync(instance, ["test:filesystem/types", "[method]directory.create-file"], [
+              dir,
+              "resource_test_#{i}.txt"
+            ])
+            |> unwrap_result("Failed to create file #{i}")
+
+          # Write to file
+          call_sync(instance, ["test:filesystem/types", "[method]file-handle.write"], [
+            file,
+            :erlang.binary_to_list("Content #{i}")
+          ])
+          |> unwrap_result("Failed to write to file #{i}")
+
+          file
         end
 
-      # Verify each resource is isolated to its store
-      assert length(stores_and_resources) == 3
+      # Close all files
+      for file <- files do
+        call_sync(instance, ["test:filesystem/types", "[method]file-handle.close"], [file])
+        |> unwrap_result("Failed to close file")
+      end
 
-      # Stores will be cleaned up, ensuring proper isolation
+      # Verify files exist on filesystem
+      for i <- 1..5 do
+        path = Path.join(sandbox_dir, "output/resource_test_#{i}.txt")
+        assert File.exists?(path)
+        assert File.read!(path) == "Content #{i}"
+      end
     end
   end
 end

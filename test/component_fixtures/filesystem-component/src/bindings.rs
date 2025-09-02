@@ -12,6 +12,7 @@ pub mod exports {
                 #[doc(hidden)]
                 static __FORCE_SECTION_REF: fn() = super::super::super::super::__link_custom_section_describing_imports;
                 use super::super::super::super::_rt;
+                /// Simplified, focused on what WASI can actually do
                 #[derive(Debug)]
                 #[repr(transparent)]
                 pub struct FileHandle {
@@ -383,6 +384,54 @@ pub mod exports {
                 }
                 #[doc(hidden)]
                 #[allow(non_snake_case)]
+                pub unsafe fn _export_method_file_handle_seek_cabi<T: GuestFileHandle>(
+                    arg0: *mut u8,
+                    arg1: i64,
+                ) -> *mut u8 {
+                    #[cfg(target_arch = "wasm32")] _rt::run_ctors_once();
+                    let result0 = T::seek(
+                        unsafe { FileHandleBorrow::lift(arg0 as u32 as usize) }.get(),
+                        arg1 as u64,
+                    );
+                    let ptr1 = (&raw mut _RET_AREA.0).cast::<u8>();
+                    match result0 {
+                        Ok(e) => {
+                            *ptr1.add(0).cast::<u8>() = (0i32) as u8;
+                            *ptr1.add(8).cast::<i64>() = _rt::as_i64(e);
+                        }
+                        Err(e) => {
+                            *ptr1.add(0).cast::<u8>() = (1i32) as u8;
+                            let vec2 = (e.into_bytes()).into_boxed_slice();
+                            let ptr2 = vec2.as_ptr().cast::<u8>();
+                            let len2 = vec2.len();
+                            ::core::mem::forget(vec2);
+                            *ptr1
+                                .add(8 + 1 * ::core::mem::size_of::<*const u8>())
+                                .cast::<usize>() = len2;
+                            *ptr1.add(8).cast::<*mut u8>() = ptr2.cast_mut();
+                        }
+                    };
+                    ptr1
+                }
+                #[doc(hidden)]
+                #[allow(non_snake_case)]
+                pub unsafe fn __post_return_method_file_handle_seek<T: GuestFileHandle>(
+                    arg0: *mut u8,
+                ) {
+                    let l0 = i32::from(*arg0.add(0).cast::<u8>());
+                    match l0 {
+                        0 => {}
+                        _ => {
+                            let l1 = *arg0.add(8).cast::<*mut u8>();
+                            let l2 = *arg0
+                                .add(8 + 1 * ::core::mem::size_of::<*const u8>())
+                                .cast::<usize>();
+                            _rt::cabi_dealloc(l1, l2, 1);
+                        }
+                    }
+                }
+                #[doc(hidden)]
+                #[allow(non_snake_case)]
                 pub unsafe fn _export_method_file_handle_close_cabi<T: GuestFileHandle>(
                     arg0: *mut u8,
                 ) {
@@ -390,6 +439,63 @@ pub mod exports {
                     T::close(
                         unsafe { FileHandleBorrow::lift(arg0 as u32 as usize) }.get(),
                     );
+                }
+                #[doc(hidden)]
+                #[allow(non_snake_case)]
+                pub unsafe fn _export_method_directory_open_file_cabi<T: GuestDirectory>(
+                    arg0: *mut u8,
+                    arg1: *mut u8,
+                    arg2: usize,
+                ) -> *mut u8 {
+                    #[cfg(target_arch = "wasm32")] _rt::run_ctors_once();
+                    let len0 = arg2;
+                    let bytes0 = _rt::Vec::from_raw_parts(arg1.cast(), len0, len0);
+                    let result1 = T::open_file(
+                        unsafe { DirectoryBorrow::lift(arg0 as u32 as usize) }.get(),
+                        _rt::string_lift(bytes0),
+                    );
+                    let ptr2 = (&raw mut _RET_AREA.0).cast::<u8>();
+                    match result1 {
+                        Ok(e) => {
+                            *ptr2.add(0).cast::<u8>() = (0i32) as u8;
+                            *ptr2
+                                .add(::core::mem::size_of::<*const u8>())
+                                .cast::<i32>() = (e).take_handle() as i32;
+                        }
+                        Err(e) => {
+                            *ptr2.add(0).cast::<u8>() = (1i32) as u8;
+                            let vec3 = (e.into_bytes()).into_boxed_slice();
+                            let ptr3 = vec3.as_ptr().cast::<u8>();
+                            let len3 = vec3.len();
+                            ::core::mem::forget(vec3);
+                            *ptr2
+                                .add(2 * ::core::mem::size_of::<*const u8>())
+                                .cast::<usize>() = len3;
+                            *ptr2
+                                .add(::core::mem::size_of::<*const u8>())
+                                .cast::<*mut u8>() = ptr3.cast_mut();
+                        }
+                    };
+                    ptr2
+                }
+                #[doc(hidden)]
+                #[allow(non_snake_case)]
+                pub unsafe fn __post_return_method_directory_open_file<
+                    T: GuestDirectory,
+                >(arg0: *mut u8) {
+                    let l0 = i32::from(*arg0.add(0).cast::<u8>());
+                    match l0 {
+                        0 => {}
+                        _ => {
+                            let l1 = *arg0
+                                .add(::core::mem::size_of::<*const u8>())
+                                .cast::<*mut u8>();
+                            let l2 = *arg0
+                                .add(2 * ::core::mem::size_of::<*const u8>())
+                                .cast::<usize>();
+                            _rt::cabi_dealloc(l1, l2, 1);
+                        }
+                    }
                 }
                 #[doc(hidden)]
                 #[allow(non_snake_case)]
@@ -448,86 +554,223 @@ pub mod exports {
                 }
                 #[doc(hidden)]
                 #[allow(non_snake_case)]
-                pub unsafe fn _export_method_directory_list_files_cabi<
+                pub unsafe fn _export_method_directory_list_entries_cabi<
                     T: GuestDirectory,
                 >(arg0: *mut u8) -> *mut u8 {
                     #[cfg(target_arch = "wasm32")] _rt::run_ctors_once();
-                    let result0 = T::list_files(
+                    let result0 = T::list_entries(
                         unsafe { DirectoryBorrow::lift(arg0 as u32 as usize) }.get(),
                     );
                     let ptr1 = (&raw mut _RET_AREA.0).cast::<u8>();
-                    let vec3 = result0;
-                    let len3 = vec3.len();
-                    let layout3 = _rt::alloc::Layout::from_size_align_unchecked(
-                        vec3.len() * (2 * ::core::mem::size_of::<*const u8>()),
-                        ::core::mem::size_of::<*const u8>(),
-                    );
-                    let result3 = if layout3.size() != 0 {
-                        let ptr = _rt::alloc::alloc(layout3).cast::<u8>();
-                        if ptr.is_null() {
-                            _rt::alloc::handle_alloc_error(layout3);
-                        }
-                        ptr
-                    } else {
-                        ::core::ptr::null_mut()
-                    };
-                    for (i, e) in vec3.into_iter().enumerate() {
-                        let base = result3
-                            .add(i * (2 * ::core::mem::size_of::<*const u8>()));
-                        {
-                            let vec2 = (e.into_bytes()).into_boxed_slice();
-                            let ptr2 = vec2.as_ptr().cast::<u8>();
-                            let len2 = vec2.len();
-                            ::core::mem::forget(vec2);
-                            *base
+                    match result0 {
+                        Ok(e) => {
+                            *ptr1.add(0).cast::<u8>() = (0i32) as u8;
+                            let vec3 = e;
+                            let len3 = vec3.len();
+                            let layout3 = _rt::alloc::Layout::from_size_align_unchecked(
+                                vec3.len() * (2 * ::core::mem::size_of::<*const u8>()),
+                                ::core::mem::size_of::<*const u8>(),
+                            );
+                            let result3 = if layout3.size() != 0 {
+                                let ptr = _rt::alloc::alloc(layout3).cast::<u8>();
+                                if ptr.is_null() {
+                                    _rt::alloc::handle_alloc_error(layout3);
+                                }
+                                ptr
+                            } else {
+                                ::core::ptr::null_mut()
+                            };
+                            for (i, e) in vec3.into_iter().enumerate() {
+                                let base = result3
+                                    .add(i * (2 * ::core::mem::size_of::<*const u8>()));
+                                {
+                                    let vec2 = (e.into_bytes()).into_boxed_slice();
+                                    let ptr2 = vec2.as_ptr().cast::<u8>();
+                                    let len2 = vec2.len();
+                                    ::core::mem::forget(vec2);
+                                    *base
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>() = len2;
+                                    *base.add(0).cast::<*mut u8>() = ptr2.cast_mut();
+                                }
+                            }
+                            *ptr1
+                                .add(2 * ::core::mem::size_of::<*const u8>())
+                                .cast::<usize>() = len3;
+                            *ptr1
                                 .add(::core::mem::size_of::<*const u8>())
-                                .cast::<usize>() = len2;
-                            *base.add(0).cast::<*mut u8>() = ptr2.cast_mut();
+                                .cast::<*mut u8>() = result3;
                         }
-                    }
-                    *ptr1.add(::core::mem::size_of::<*const u8>()).cast::<usize>() = len3;
-                    *ptr1.add(0).cast::<*mut u8>() = result3;
+                        Err(e) => {
+                            *ptr1.add(0).cast::<u8>() = (1i32) as u8;
+                            let vec4 = (e.into_bytes()).into_boxed_slice();
+                            let ptr4 = vec4.as_ptr().cast::<u8>();
+                            let len4 = vec4.len();
+                            ::core::mem::forget(vec4);
+                            *ptr1
+                                .add(2 * ::core::mem::size_of::<*const u8>())
+                                .cast::<usize>() = len4;
+                            *ptr1
+                                .add(::core::mem::size_of::<*const u8>())
+                                .cast::<*mut u8>() = ptr4.cast_mut();
+                        }
+                    };
                     ptr1
                 }
                 #[doc(hidden)]
                 #[allow(non_snake_case)]
-                pub unsafe fn __post_return_method_directory_list_files<
+                pub unsafe fn __post_return_method_directory_list_entries<
                     T: GuestDirectory,
                 >(arg0: *mut u8) {
-                    let l0 = *arg0.add(0).cast::<*mut u8>();
-                    let l1 = *arg0
-                        .add(::core::mem::size_of::<*const u8>())
-                        .cast::<usize>();
-                    let base4 = l0;
-                    let len4 = l1;
-                    for i in 0..len4 {
-                        let base = base4
-                            .add(i * (2 * ::core::mem::size_of::<*const u8>()));
-                        {
-                            let l2 = *base.add(0).cast::<*mut u8>();
-                            let l3 = *base
+                    let l0 = i32::from(*arg0.add(0).cast::<u8>());
+                    match l0 {
+                        0 => {
+                            let l1 = *arg0
                                 .add(::core::mem::size_of::<*const u8>())
+                                .cast::<*mut u8>();
+                            let l2 = *arg0
+                                .add(2 * ::core::mem::size_of::<*const u8>())
                                 .cast::<usize>();
-                            _rt::cabi_dealloc(l2, l3, 1);
+                            let base5 = l1;
+                            let len5 = l2;
+                            for i in 0..len5 {
+                                let base = base5
+                                    .add(i * (2 * ::core::mem::size_of::<*const u8>()));
+                                {
+                                    let l3 = *base.add(0).cast::<*mut u8>();
+                                    let l4 = *base
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    _rt::cabi_dealloc(l3, l4, 1);
+                                }
+                            }
+                            _rt::cabi_dealloc(
+                                base5,
+                                len5 * (2 * ::core::mem::size_of::<*const u8>()),
+                                ::core::mem::size_of::<*const u8>(),
+                            );
+                        }
+                        _ => {
+                            let l6 = *arg0
+                                .add(::core::mem::size_of::<*const u8>())
+                                .cast::<*mut u8>();
+                            let l7 = *arg0
+                                .add(2 * ::core::mem::size_of::<*const u8>())
+                                .cast::<usize>();
+                            _rt::cabi_dealloc(l6, l7, 1);
                         }
                     }
-                    _rt::cabi_dealloc(
-                        base4,
-                        len4 * (2 * ::core::mem::size_of::<*const u8>()),
-                        ::core::mem::size_of::<*const u8>(),
-                    );
                 }
                 #[doc(hidden)]
                 #[allow(non_snake_case)]
-                pub unsafe fn _export_create_test_directory_cabi<T: Guest>() -> i32 {
+                pub unsafe fn _export_method_directory_delete_file_cabi<
+                    T: GuestDirectory,
+                >(arg0: *mut u8, arg1: *mut u8, arg2: usize) -> *mut u8 {
                     #[cfg(target_arch = "wasm32")] _rt::run_ctors_once();
-                    let result0 = T::create_test_directory();
-                    (result0).take_handle() as i32
+                    let len0 = arg2;
+                    let bytes0 = _rt::Vec::from_raw_parts(arg1.cast(), len0, len0);
+                    let result1 = T::delete_file(
+                        unsafe { DirectoryBorrow::lift(arg0 as u32 as usize) }.get(),
+                        _rt::string_lift(bytes0),
+                    );
+                    let ptr2 = (&raw mut _RET_AREA.0).cast::<u8>();
+                    match result1 {
+                        Ok(_) => {
+                            *ptr2.add(0).cast::<u8>() = (0i32) as u8;
+                        }
+                        Err(e) => {
+                            *ptr2.add(0).cast::<u8>() = (1i32) as u8;
+                            let vec3 = (e.into_bytes()).into_boxed_slice();
+                            let ptr3 = vec3.as_ptr().cast::<u8>();
+                            let len3 = vec3.len();
+                            ::core::mem::forget(vec3);
+                            *ptr2
+                                .add(2 * ::core::mem::size_of::<*const u8>())
+                                .cast::<usize>() = len3;
+                            *ptr2
+                                .add(::core::mem::size_of::<*const u8>())
+                                .cast::<*mut u8>() = ptr3.cast_mut();
+                        }
+                    };
+                    ptr2
+                }
+                #[doc(hidden)]
+                #[allow(non_snake_case)]
+                pub unsafe fn __post_return_method_directory_delete_file<
+                    T: GuestDirectory,
+                >(arg0: *mut u8) {
+                    let l0 = i32::from(*arg0.add(0).cast::<u8>());
+                    match l0 {
+                        0 => {}
+                        _ => {
+                            let l1 = *arg0
+                                .add(::core::mem::size_of::<*const u8>())
+                                .cast::<*mut u8>();
+                            let l2 = *arg0
+                                .add(2 * ::core::mem::size_of::<*const u8>())
+                                .cast::<usize>();
+                            _rt::cabi_dealloc(l1, l2, 1);
+                        }
+                    }
+                }
+                #[doc(hidden)]
+                #[allow(non_snake_case)]
+                pub unsafe fn _export_open_directory_cabi<T: Guest>(
+                    arg0: *mut u8,
+                    arg1: usize,
+                ) -> *mut u8 {
+                    #[cfg(target_arch = "wasm32")] _rt::run_ctors_once();
+                    let len0 = arg1;
+                    let bytes0 = _rt::Vec::from_raw_parts(arg0.cast(), len0, len0);
+                    let result1 = T::open_directory(_rt::string_lift(bytes0));
+                    let ptr2 = (&raw mut _RET_AREA.0).cast::<u8>();
+                    match result1 {
+                        Ok(e) => {
+                            *ptr2.add(0).cast::<u8>() = (0i32) as u8;
+                            *ptr2
+                                .add(::core::mem::size_of::<*const u8>())
+                                .cast::<i32>() = (e).take_handle() as i32;
+                        }
+                        Err(e) => {
+                            *ptr2.add(0).cast::<u8>() = (1i32) as u8;
+                            let vec3 = (e.into_bytes()).into_boxed_slice();
+                            let ptr3 = vec3.as_ptr().cast::<u8>();
+                            let len3 = vec3.len();
+                            ::core::mem::forget(vec3);
+                            *ptr2
+                                .add(2 * ::core::mem::size_of::<*const u8>())
+                                .cast::<usize>() = len3;
+                            *ptr2
+                                .add(::core::mem::size_of::<*const u8>())
+                                .cast::<*mut u8>() = ptr3.cast_mut();
+                        }
+                    };
+                    ptr2
+                }
+                #[doc(hidden)]
+                #[allow(non_snake_case)]
+                pub unsafe fn __post_return_open_directory<T: Guest>(arg0: *mut u8) {
+                    let l0 = i32::from(*arg0.add(0).cast::<u8>());
+                    match l0 {
+                        0 => {}
+                        _ => {
+                            let l1 = *arg0
+                                .add(::core::mem::size_of::<*const u8>())
+                                .cast::<*mut u8>();
+                            let l2 = *arg0
+                                .add(2 * ::core::mem::size_of::<*const u8>())
+                                .cast::<usize>();
+                            _rt::cabi_dealloc(l1, l2, 1);
+                        }
+                    }
                 }
                 pub trait Guest {
                     type FileHandle: GuestFileHandle;
                     type Directory: GuestDirectory;
-                    fn create_test_directory() -> Directory;
+                    /// Factory functions that work with preopened dirs
+                    fn open_directory(
+                        path: _rt::String,
+                    ) -> Result<Directory, _rt::String>;
                 }
                 pub trait GuestFileHandle: 'static {
                     #[doc(hidden)]
@@ -572,6 +815,7 @@ pub mod exports {
                     }
                     fn read(&self, length: u32) -> Result<_rt::Vec<u8>, _rt::String>;
                     fn write(&self, data: _rt::Vec<u8>) -> Result<u32, _rt::String>;
+                    fn seek(&self, offset: u64) -> Result<u64, _rt::String>;
                     fn close(&self) -> ();
                 }
                 pub trait GuestDirectory: 'static {
@@ -615,11 +859,16 @@ pub mod exports {
                             unsafe { rep(handle) }
                         }
                     }
+                    fn open_file(
+                        &self,
+                        path: _rt::String,
+                    ) -> Result<FileHandle, _rt::String>;
                     fn create_file(
                         &self,
-                        name: _rt::String,
+                        path: _rt::String,
                     ) -> Result<FileHandle, _rt::String>;
-                    fn list_files(&self) -> _rt::Vec<_rt::String>;
+                    fn list_entries(&self) -> Result<_rt::Vec<_rt::String>, _rt::String>;
+                    fn delete_file(&self, path: _rt::String) -> Result<(), _rt::String>;
                 }
                 #[doc(hidden)]
                 macro_rules! __export_test_filesystem_types_cabi {
@@ -648,12 +897,36 @@ pub mod exports {
                         * mut u8,) { unsafe { $($path_to_types)*::
                         __post_return_method_file_handle_write::<<$ty as
                         $($path_to_types)*:: Guest >::FileHandle > (arg0) } } #[unsafe
+                        (export_name = "test:filesystem/types#[method]file-handle.seek")]
+                        unsafe extern "C" fn export_method_file_handle_seek(arg0 : * mut
+                        u8, arg1 : i64,) -> * mut u8 { unsafe { $($path_to_types)*::
+                        _export_method_file_handle_seek_cabi::<<$ty as
+                        $($path_to_types)*:: Guest >::FileHandle > (arg0, arg1) } }
+                        #[unsafe (export_name =
+                        "cabi_post_test:filesystem/types#[method]file-handle.seek")]
+                        unsafe extern "C" fn _post_return_method_file_handle_seek(arg0 :
+                        * mut u8,) { unsafe { $($path_to_types)*::
+                        __post_return_method_file_handle_seek::<<$ty as
+                        $($path_to_types)*:: Guest >::FileHandle > (arg0) } } #[unsafe
                         (export_name =
                         "test:filesystem/types#[method]file-handle.close")] unsafe extern
                         "C" fn export_method_file_handle_close(arg0 : * mut u8,) { unsafe
                         { $($path_to_types)*::
                         _export_method_file_handle_close_cabi::<<$ty as
                         $($path_to_types)*:: Guest >::FileHandle > (arg0) } } #[unsafe
+                        (export_name =
+                        "test:filesystem/types#[method]directory.open-file")] unsafe
+                        extern "C" fn export_method_directory_open_file(arg0 : * mut u8,
+                        arg1 : * mut u8, arg2 : usize,) -> * mut u8 { unsafe {
+                        $($path_to_types)*::
+                        _export_method_directory_open_file_cabi::<<$ty as
+                        $($path_to_types)*:: Guest >::Directory > (arg0, arg1, arg2) } }
+                        #[unsafe (export_name =
+                        "cabi_post_test:filesystem/types#[method]directory.open-file")]
+                        unsafe extern "C" fn _post_return_method_directory_open_file(arg0
+                        : * mut u8,) { unsafe { $($path_to_types)*::
+                        __post_return_method_directory_open_file::<<$ty as
+                        $($path_to_types)*:: Guest >::Directory > (arg0) } } #[unsafe
                         (export_name =
                         "test:filesystem/types#[method]directory.create-file")] unsafe
                         extern "C" fn export_method_directory_create_file(arg0 : * mut
@@ -669,23 +942,41 @@ pub mod exports {
                         __post_return_method_directory_create_file::<<$ty as
                         $($path_to_types)*:: Guest >::Directory > (arg0) } } #[unsafe
                         (export_name =
-                        "test:filesystem/types#[method]directory.list-files")] unsafe
-                        extern "C" fn export_method_directory_list_files(arg0 : * mut
+                        "test:filesystem/types#[method]directory.list-entries")] unsafe
+                        extern "C" fn export_method_directory_list_entries(arg0 : * mut
                         u8,) -> * mut u8 { unsafe { $($path_to_types)*::
-                        _export_method_directory_list_files_cabi::<<$ty as
+                        _export_method_directory_list_entries_cabi::<<$ty as
                         $($path_to_types)*:: Guest >::Directory > (arg0) } } #[unsafe
                         (export_name =
-                        "cabi_post_test:filesystem/types#[method]directory.list-files")]
+                        "cabi_post_test:filesystem/types#[method]directory.list-entries")]
                         unsafe extern "C" fn
-                        _post_return_method_directory_list_files(arg0 : * mut u8,) {
+                        _post_return_method_directory_list_entries(arg0 : * mut u8,) {
                         unsafe { $($path_to_types)*::
-                        __post_return_method_directory_list_files::<<$ty as
+                        __post_return_method_directory_list_entries::<<$ty as
                         $($path_to_types)*:: Guest >::Directory > (arg0) } } #[unsafe
-                        (export_name = "test:filesystem/types#create-test-directory")]
-                        unsafe extern "C" fn export_create_test_directory() -> i32 {
+                        (export_name =
+                        "test:filesystem/types#[method]directory.delete-file")] unsafe
+                        extern "C" fn export_method_directory_delete_file(arg0 : * mut
+                        u8, arg1 : * mut u8, arg2 : usize,) -> * mut u8 { unsafe {
+                        $($path_to_types)*::
+                        _export_method_directory_delete_file_cabi::<<$ty as
+                        $($path_to_types)*:: Guest >::Directory > (arg0, arg1, arg2) } }
+                        #[unsafe (export_name =
+                        "cabi_post_test:filesystem/types#[method]directory.delete-file")]
+                        unsafe extern "C" fn
+                        _post_return_method_directory_delete_file(arg0 : * mut u8,) {
                         unsafe { $($path_to_types)*::
-                        _export_create_test_directory_cabi::<$ty > () } } const _ : () =
-                        { #[doc(hidden)] #[unsafe (export_name =
+                        __post_return_method_directory_delete_file::<<$ty as
+                        $($path_to_types)*:: Guest >::Directory > (arg0) } } #[unsafe
+                        (export_name = "test:filesystem/types#open-directory")] unsafe
+                        extern "C" fn export_open_directory(arg0 : * mut u8, arg1 :
+                        usize,) -> * mut u8 { unsafe { $($path_to_types)*::
+                        _export_open_directory_cabi::<$ty > (arg0, arg1) } } #[unsafe
+                        (export_name = "cabi_post_test:filesystem/types#open-directory")]
+                        unsafe extern "C" fn _post_return_open_directory(arg0 : * mut
+                        u8,) { unsafe { $($path_to_types)*::
+                        __post_return_open_directory::<$ty > (arg0) } } const _ : () = {
+                        #[doc(hidden)] #[unsafe (export_name =
                         "test:filesystem/types#[dtor]file-handle")]
                         #[allow(non_snake_case)] unsafe extern "C" fn dtor(rep : * mut
                         u8) { unsafe { $($path_to_types)*:: FileHandle::dtor::< <$ty as
@@ -699,16 +990,15 @@ pub mod exports {
                 }
                 #[doc(hidden)]
                 pub(crate) use __export_test_filesystem_types_cabi;
-                #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
-                #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                #[repr(align(8))]
                 struct _RetArea(
                     [::core::mem::MaybeUninit<
                         u8,
-                    >; 3 * ::core::mem::size_of::<*const u8>()],
+                    >; 8 + 2 * ::core::mem::size_of::<*const u8>()],
                 );
                 static mut _RET_AREA: _RetArea = _RetArea(
-                    [::core::mem::MaybeUninit::uninit(); 3
-                        * ::core::mem::size_of::<*const u8>()],
+                    [::core::mem::MaybeUninit::uninit(); 8
+                        + 2 * ::core::mem::size_of::<*const u8>()],
                 );
             }
         }
@@ -864,6 +1154,29 @@ mod _rt {
             self as i32
         }
     }
+    pub fn as_i64<T: AsI64>(t: T) -> i64 {
+        t.as_i64()
+    }
+    pub trait AsI64 {
+        fn as_i64(self) -> i64;
+    }
+    impl<'a, T: Copy + AsI64> AsI64 for &'a T {
+        fn as_i64(self) -> i64 {
+            (*self).as_i64()
+        }
+    }
+    impl AsI64 for i64 {
+        #[inline]
+        fn as_i64(self) -> i64 {
+            self as i64
+        }
+    }
+    impl AsI64 for u64 {
+        #[inline]
+        fn as_i64(self) -> i64 {
+            self as i64
+        }
+    }
     pub unsafe fn string_lift(bytes: Vec<u8>) -> String {
         if cfg!(debug_assertions) {
             String::from_utf8(bytes).unwrap()
@@ -910,19 +1223,22 @@ pub(crate) use __export_filesystem_test_impl as export;
 )]
 #[doc(hidden)]
 #[allow(clippy::octal_escapes)]
-pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 533] = *b"\
-\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\x8f\x03\x01A\x02\x01\
-A\x02\x01B\x17\x04\0\x0bfile-handle\x03\x01\x04\0\x09directory\x03\x01\x01h\0\x01\
+pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 688] = *b"\
+\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\xaa\x04\x01A\x02\x01\
+A\x02\x01B\x20\x04\0\x0bfile-handle\x03\x01\x04\0\x09directory\x03\x01\x01h\0\x01\
 p}\x01j\x01\x03\x01s\x01@\x02\x04self\x02\x06lengthy\0\x04\x04\0\x18[method]file\
 -handle.read\x01\x05\x01j\x01y\x01s\x01@\x02\x04self\x02\x04data\x03\0\x06\x04\0\
-\x19[method]file-handle.write\x01\x07\x01@\x01\x04self\x02\x01\0\x04\0\x19[metho\
-d]file-handle.close\x01\x08\x01h\x01\x01i\0\x01j\x01\x0a\x01s\x01@\x02\x04self\x09\
-\x04names\0\x0b\x04\0\x1d[method]directory.create-file\x01\x0c\x01ps\x01@\x01\x04\
-self\x09\0\x0d\x04\0\x1c[method]directory.list-files\x01\x0e\x01i\x01\x01@\0\0\x0f\
-\x04\0\x15create-test-directory\x01\x10\x04\0\x15test:filesystem/types\x05\0\x04\
-\0\x1ftest:filesystem/filesystem-test\x04\0\x0b\x15\x01\0\x0ffilesystem-test\x03\
-\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-component\x070.227.1\x10wit-\
-bindgen-rust\x060.41.0";
+\x19[method]file-handle.write\x01\x07\x01j\x01w\x01s\x01@\x02\x04self\x02\x06off\
+setw\0\x08\x04\0\x18[method]file-handle.seek\x01\x09\x01@\x01\x04self\x02\x01\0\x04\
+\0\x19[method]file-handle.close\x01\x0a\x01h\x01\x01i\0\x01j\x01\x0c\x01s\x01@\x02\
+\x04self\x0b\x04paths\0\x0d\x04\0\x1b[method]directory.open-file\x01\x0e\x04\0\x1d\
+[method]directory.create-file\x01\x0e\x01ps\x01j\x01\x0f\x01s\x01@\x01\x04self\x0b\
+\0\x10\x04\0\x1e[method]directory.list-entries\x01\x11\x01j\0\x01s\x01@\x02\x04s\
+elf\x0b\x04paths\0\x12\x04\0\x1d[method]directory.delete-file\x01\x13\x01i\x01\x01\
+j\x01\x14\x01s\x01@\x01\x04paths\0\x15\x04\0\x0eopen-directory\x01\x16\x04\0\x15\
+test:filesystem/types\x05\0\x04\0\x1ftest:filesystem/filesystem-test\x04\0\x0b\x15\
+\x01\0\x0ffilesystem-test\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit\
+-component\x070.227.1\x10wit-bindgen-rust\x060.41.0";
 #[inline(never)]
 #[doc(hidden)]
 pub fn __link_custom_section_describing_imports() {

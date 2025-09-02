@@ -16,33 +16,67 @@ struct Component;
 
 impl Guest for Component {
     fn test_filesystem_write(path: String, content: String) -> Result<u32, String> {
-        fs::write(&path, &content)
-            .map_err(|e| format!("Failed to write file: {}", e))?;
+        // Try to write to the preopened directory
+        // First try with "wasi_test" prefix (our mapped name)
+        let wasi_path = format!("wasi_test/{}", path);
+        let result = fs::write(&wasi_path, &content);
+        
+        // If that fails, try the path as-is (for backwards compatibility)
+        let result = if result.is_err() {
+            fs::write(&path, &content)
+        } else {
+            result
+        };
+        
+        result.map_err(|e| format!("Failed to write file: {}", e))?;
         Ok(content.len() as u32)
     }
     
     fn test_filesystem_read(path: String) -> Result<String, String> {
-        fs::read_to_string(&path)
-            .map_err(|e| format!("Failed to read file: {}", e))
+        // Try to read from the preopened directory
+        let wasi_path = format!("wasi_test/{}", path);
+        let result = fs::read_to_string(&wasi_path);
+        
+        // If that fails, try the path as-is
+        if result.is_err() {
+            fs::read_to_string(&path)
+                .map_err(|e| format!("Failed to read file: {}", e))
+        } else {
+            result.map_err(|e| format!("Failed to read file: {}", e))
+        }
     }
     
     fn test_filesystem_delete(path: String) -> Result<(), String> {
-        fs::remove_file(&path)
-            .map_err(|e| format!("Failed to delete file: {}", e))
+        // Try to delete from the preopened directory
+        let wasi_path = format!("wasi_test/{}", path);
+        let result = fs::remove_file(&wasi_path);
+        
+        // If that fails, try the path as-is
+        if result.is_err() {
+            fs::remove_file(&path)
+                .map_err(|e| format!("Failed to delete file: {}", e))
+        } else {
+            result.map_err(|e| format!("Failed to delete file: {}", e))
+        }
     }
     
     fn test_filesystem_exists(path: String) -> bool {
-        Path::new(&path).exists()
+        // Check both paths
+        let wasi_path = format!("wasi_test/{}", path);
+        Path::new(&wasi_path).exists() || Path::new(&path).exists()
     }
     
     fn test_filesystem_list_dir(path: String) -> Result<Vec<String>, String> {
-        let dir_path = if path.is_empty() || path == "." {
-            Path::new(".")
+        // Try with wasi_test prefix first
+        let dir_path_string = if path.is_empty() || path == "." {
+            "wasi_test".to_string()
+        } else if path.starts_with("wasi_test/") {
+            path
         } else {
-            Path::new(&path)
+            format!("wasi_test/{}", path)
         };
         
-        let entries = fs::read_dir(dir_path)
+        let entries = fs::read_dir(Path::new(&dir_path_string))
             .map_err(|e| format!("Failed to read directory: {}", e))?;
         
         let mut names = Vec::new();

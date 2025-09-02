@@ -199,6 +199,72 @@ defmodule Wasmex.Components do
 
   Support for the Component Model, including resources, should be considered beta quality.
 
+  ## WASI Filesystem Resources
+
+  Wasmex supports real WASI filesystem operations through preopened directories.
+  This allows WebAssembly components to perform actual file I/O operations on the host filesystem
+  in a controlled and secure manner.
+
+  ### Setup Requirements
+
+  1. Create a store with preopened directories:
+     ```elixir
+     {:ok, store} = Wasmex.Components.Store.new_wasi(%WasiP2Options{
+       preopen_dirs: [
+         "/host/path/input",   # Component can access this as a preopened directory
+         "/host/path/output"   # Component can write files here
+       ]
+     })
+     ```
+
+  2. WASM component can only access preopened paths
+  3. All paths in WASM are relative to preopens
+
+  ### Security Model
+
+  - Components CANNOT access arbitrary filesystem paths
+  - Only explicitly preopened directories are accessible
+  - Path traversal (../) is blocked by WASI runtime
+  - Consider using temporary directories for isolation
+
+  ### Example
+
+  ```elixir
+  # Create a sandboxed directory for testing
+  sandbox_dir = Path.join(System.tmp_dir!(), "wasmex_#{:rand.uniform(10000)}")
+  File.mkdir_p!(sandbox_dir)
+
+  # Create subdirectories
+  File.mkdir_p!(Path.join(sandbox_dir, "input"))
+  File.mkdir_p!(Path.join(sandbox_dir, "output"))
+
+  # Setup WASI with filesystem access
+  {:ok, store} = Wasmex.Components.Store.new_wasi(%WasiP2Options{
+    preopen_dirs: [
+      Path.join(sandbox_dir, "input"),
+      Path.join(sandbox_dir, "output")
+    ],
+    inherit_stdout: true,
+    inherit_stderr: true
+  })
+
+  # Load component and create instance
+  component_bytes = File.read!("filesystem_component.wasm")
+  {:ok, component} = Wasmex.Components.Component.new(store, component_bytes)
+  {:ok, instance} = Wasmex.Components.Instance.new(store, component, %{})
+
+  # Component can now perform real file operations
+  {:ok, dir} = Instance.call_function(instance, ["types", "open-directory"], ["/output"])
+  {:ok, file} = Instance.call_function(instance, ["types", "[method]directory.create-file"], [dir, "test.txt"])
+  {:ok, _} = Instance.call_function(instance, ["types", "[method]file-handle.write"], [file, "Hello WASI!"])
+
+  # File now exists on host filesystem
+  File.read!(Path.join(sandbox_dir, "output/test.txt"))  # => "Hello WASI!"
+
+  # Clean up
+  File.rm_rf!(sandbox_dir)
+  ```
+
   ## Options
 
   The `start_link/1` function accepts the following options:

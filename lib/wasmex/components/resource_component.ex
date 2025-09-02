@@ -36,11 +36,11 @@ defmodule Wasmex.Components.ResourceComponent do
 
   # Start and use the resource
   {:ok, pid} = MyApp.CounterResource.start_link(42)
-  
+
   # Methods return {:ok, result} or {:error, reason}
   {:ok, 43} = MyApp.CounterResource.increment(pid)
   {:ok, 43} = MyApp.CounterResource.get_value(pid)
-  
+
   # Error handling
   case MyApp.CounterResource.increment(pid) do
     {:ok, new_value} -> IO.puts("New value: \#{new_value}")

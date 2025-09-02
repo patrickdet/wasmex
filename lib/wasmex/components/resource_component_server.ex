@@ -64,7 +64,7 @@ defmodule Wasmex.Components.ResourceComponentServer do
   {:ok, 43} = MyApp.Counter.increment(pid)
   {:ok, 43} = MyApp.Counter.get_value(pid)
   {:ok, nil} = MyApp.Counter.reset(pid, 0)
-  
+
   # Error handling
   case MyApp.Counter.increment(pid) do
     {:ok, new_value} -> IO.puts("Incremented to \#{new_value}")
