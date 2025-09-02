@@ -131,12 +131,88 @@ defmodule Wasmex.Components do
       {:error, 404}  # error case
       ```
 
-  ### Currently Unsupported Types
+    - `resource` (stateful objects with methods)
+      ```wit
+      resource counter {
+        constructor(initial: u32);
+        increment: func() -> u32;
+        get-value: func() -> u32;
+      }
+      ```
+      Resources are created using constructors and map to Elixir references.
+      See the "Working with Resources" section below for details.
 
-  The following WIT type is not yet supported:
-  - Resources
+  ## Working with Resources
 
-  Support for the Component Model should be considered beta quality.
+  Resources are stateful objects in the Component Model with constructors and methods.
+  They provide an object-oriented interface for WebAssembly components.
+
+  ### Creating Resources (Constructors)
+
+  The idiomatic way to create resources is using their constructors:
+
+  ```elixir
+  # Setup
+  {:ok, store} = Wasmex.Components.Store.new()
+  {:ok, component} = Wasmex.Components.Component.new(store, component_bytes)
+  {:ok, instance} = Wasmex.Components.Instance.new(store, component, %{})
+
+  # Create a resource using its constructor
+  {:ok, counter} = Wasmex.Components.Instance.new_resource(
+    instance,
+    ["component:counter/types", "counter"],
+    [42]  # constructor arguments
+  )
+  ```
+
+  ### Calling Resource Methods
+
+  Once you have a resource, you can call its methods:
+
+  ```elixir
+  # Clean and simple API
+  {:ok, new_value} = Wasmex.Components.Instance.call(instance, counter, "increment")
+  IO.puts("Counter incremented to: " <> Integer.to_string(new_value))
+
+  # Get the current value
+  {:ok, value} = Wasmex.Components.Instance.call(instance, counter, "get-value")
+
+  # Reset with a parameter
+  :ok = Wasmex.Components.Instance.call(instance, counter, "reset", [100])
+
+  # With explicit interface
+  {:ok, result} = Wasmex.Components.Instance.call(
+    instance,
+    resource,
+    "process",
+    [42, "hello"],
+    interface: ["my:interface"]
+  )
+  ```
+
+  ### Resource Lifecycle
+
+  - Resources are tied to the store that created them
+  - Resources cannot be used across different stores
+  - Resources are automatically cleaned up when the store is dropped
+  - Resources can be passed as arguments to functions and returned from functions
+
+  ### Legacy Factory Functions
+
+  Some components may also expose factory functions to create resources.
+  While these work, using constructors directly is the recommended approach:
+
+  ```elixir
+  # Legacy approach - factory function
+  :ok = Wasmex.Components.Instance.call_function(
+    instance,
+    ["component:counter/types", "make-counter"],
+    [42],
+    from
+  )
+  ```
+
+  Support for the Component Model, including resources, should be considered beta quality.
 
   ## Options
 

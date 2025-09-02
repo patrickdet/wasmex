@@ -45,15 +45,64 @@ defmodule Wasmex.ComponentResourceTest do
       end
     end
 
-    test "can create counter resource", %{instance: instance} do
+    test "can create counter resource using constructor (recommended)", %{instance: instance} do
+      # Create a counter using the constructor - clean and simple!
+      {:ok, counter} =
+        Wasmex.Components.Instance.new_resource(
+          instance,
+          ["component:counter/types", "counter"],
+          # initial value
+          [5]
+        )
+
+      # Verify it's a resource (will be a reference in Elixir)
+      assert is_reference(counter)
+
+      # Test that we can call methods on the resource
+      {:ok, value} = Wasmex.Components.Instance.call(instance, counter, "get-value")
+      assert value == 5
+
+      # Increment and verify
+      {:ok, new_value} = Wasmex.Components.Instance.call(instance, counter, "increment")
+      assert new_value == 6
+    end
+
+    test "can create and use counter with clean API", %{instance: instance} do
+      # Create counter using clean API
+      {:ok, counter} =
+        Wasmex.Components.Instance.new_resource(
+          instance,
+          ["component:counter/types", "counter"],
+          [10]
+        )
+
+      assert is_reference(counter)
+
+      # Call methods using the clean API - no interface needed for default
+      {:ok, value} = Wasmex.Components.Instance.call(instance, counter, "get-value")
+      assert value == 10
+
+      # Increment the counter
+      {:ok, new_value} = Wasmex.Components.Instance.call(instance, counter, "increment")
+      assert new_value == 11
+
+      # Reset the counter (returns nothing)
+      :ok = Wasmex.Components.Instance.call(instance, counter, "reset", [100])
+
+      # Verify reset worked
+      {:ok, value} = Wasmex.Components.Instance.call(instance, counter, "get-value")
+      assert value == 100
+    end
+
+    test "can create counter resource using factory function (legacy)", %{instance: instance} do
       from = self()
 
-      # Create a counter with initial value 5
+      # Create a counter with factory function - works but constructor is preferred
       :ok =
         Wasmex.Components.Instance.call_function(
           instance,
           ["component:counter/types", "make-counter"],
-          [5],
+          [42],
           from
         )
 

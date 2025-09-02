@@ -113,6 +113,15 @@ defmodule Wasmex.Native do
       ),
       do: error()
 
+  def resource_new(
+        _store,
+        _instance,
+        _resource_type_path,
+        _params,
+        _from
+      ),
+      do: error()
+
   def host_resource_new(_store, _resource_id, _type_name), do: error()
 
   def host_resource_type_register(_type_name), do: error()

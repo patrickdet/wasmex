@@ -1,11 +1,12 @@
 use rustler::{Encoder, Env, OwnedEnv, ResourceArc, Term};
 use std::thread;
 use wasmtime::component::Val;
+use wasmtime::Store;
 
 use crate::atoms;
 use crate::component_instance::ComponentInstanceResource;
 use crate::component_type_conversion::{convert_params, vals_to_terms_with_store};
-use crate::store::ComponentStoreResource;
+use crate::store::{ComponentStoreData, ComponentStoreResource};
 use crate::wasi_resource::WasiResourceWrapper;
 use rustler::env::SavedTerm;
 use rustler::types::tuple::make_tuple;
@@ -258,32 +259,259 @@ fn execute_resource_method(
 }
 
 /// Create a new resource instance (constructor)
-// #[rustler::nif(name = "resource_new", schedule = "DirtyCpu")]
+#[rustler::nif(name = "resource_new", schedule = "DirtyCpu")]
 pub fn resource_new<'a>(
     env: Env<'a>,
-    _store_resource: ResourceArc<ComponentStoreResource>,
-    _resource_type_path: Vec<String>,
-    _params: Vec<Term<'a>>,
+    store_resource: ResourceArc<ComponentStoreResource>,
+    instance_resource: ResourceArc<ComponentInstanceResource>,
+    resource_type_path: Vec<String>,
+    params: Vec<Term<'a>>,
     from: Term<'a>,
 ) -> Term<'a> {
-    // TODO: Implement resource constructor
-    // This requires:
-    // 1. Looking up the resource type
-    // 2. Finding the constructor signature
-    // 3. Converting parameters
-    // 4. Calling the constructor
-    // 5. Creating a WasiResourceWrapper
-    // 6. Registering it with the store's resource registry
-    // 7. Returning the wrapped resource
+    // Spawn thread for async execution (like resource_call_method)
+    let pid = env.pid();
+    let mut thread_env = OwnedEnv::new();
+    let saved_params = thread_env.save(params);
+    let saved_from = thread_env.save(from);
 
-    let error_msg = "Resource constructor not yet implemented".to_string();
-    let error_tuple = env.error_tuple(error_msg);
-    rustler::types::tuple::make_tuple(
-        env,
-        &[
-            atoms::returned_function_call().encode(env),
-            error_tuple,
-            from,
-        ],
-    )
+    thread::spawn(move || {
+        thread_env.send_and_clear(&pid, |thread_env| {
+            execute_resource_constructor(
+                thread_env,
+                store_resource,
+                instance_resource,
+                resource_type_path,
+                saved_params,
+                saved_from,
+            )
+        })
+    });
+
+    atoms::ok().encode(env)
+}
+
+fn execute_resource_constructor(
+    env: Env,
+    store_resource: ResourceArc<ComponentStoreResource>,
+    instance_resource: ResourceArc<ComponentInstanceResource>,
+    resource_type_path: Vec<String>,
+    saved_params: SavedTerm,
+    saved_from: SavedTerm,
+) -> Term {
+    let from = saved_from
+        .load(env)
+        .decode::<Term>()
+        .unwrap_or_else(|_| "could not load 'from' param".encode(env));
+
+    // Lock store and instance
+    let mut store = store_resource.inner.lock().unwrap();
+    let instance = instance_resource.inner.lock().unwrap();
+
+    // Load the params
+    let params = match saved_params.load(env).decode::<Vec<Term>>() {
+        Ok(p) => p,
+        Err(err) => {
+            let error_msg = format!("Could not load params: {:?}", err);
+            let error_tuple = env.error_tuple(error_msg);
+            return make_tuple(
+                env,
+                &[
+                    atoms::returned_function_call().encode(env),
+                    error_tuple,
+                    from,
+                ],
+            );
+        }
+    };
+
+    // Parse the resource type path
+    let (interface_path, resource_name) = match parse_resource_path(resource_type_path.clone()) {
+        Ok(result) => result,
+        Err(err) => {
+            let error_tuple = env.error_tuple(err);
+            return make_tuple(
+                env,
+                &[
+                    atoms::returned_function_call().encode(env),
+                    error_tuple,
+                    from,
+                ],
+            );
+        }
+    };
+
+    // Find the constructor function
+    let constructor_name = format!("[constructor]{}", resource_name);
+    let function = match lookup_constructor(&instance, &mut *store, &interface_path, &constructor_name) {
+        Ok(func) => func,
+        Err(err) => {
+            let error_tuple = env.error_tuple(err);
+            return make_tuple(
+                env,
+                &[
+                    atoms::returned_function_call().encode(env),
+                    error_tuple,
+                    from,
+                ],
+            );
+        }
+    };
+
+    // Convert parameters
+    let param_types: Vec<wasmtime::component::Type> = function
+        .params(&*store)
+        .iter()
+        .map(|(_, ty)| ty.clone())
+        .collect();
+
+    let wasm_params = match convert_params(&param_types, params) {
+        Ok(params) => params,
+        Err(err) => {
+            let error_msg = format!("Parameter conversion error: {:?}", err);
+            let error_tuple = env.error_tuple(error_msg);
+            return make_tuple(
+                env,
+                &[
+                    atoms::returned_function_call().encode(env),
+                    error_tuple,
+                    from,
+                ],
+            );
+        }
+    };
+
+    // Call the constructor
+    let result_count = function.results(&*store).len();
+    let mut results = vec![Val::Bool(false); result_count];
+
+    let store_id = store.data().store_id;
+    match function.call(&mut *store, &wasm_params, &mut results) {
+        Ok(_) => {
+            match function.post_return(&mut *store) {
+                Ok(_) => {},
+                Err(err) => {
+                    let error_msg = format!("post_return error: {:?}", err);
+                    let error_tuple = env.error_tuple(error_msg);
+                    return make_tuple(
+                        env,
+                        &[
+                            atoms::returned_function_call().encode(env),
+                            error_tuple,
+                            from,
+                        ],
+                    );
+                }
+            }
+
+            // Extract the resource from results
+            if results.len() != 1 {
+                let error_msg = format!("Constructor returned {} values, expected 1 resource", results.len());
+                let error_tuple = env.error_tuple(error_msg);
+                return make_tuple(
+                    env,
+                    &[
+                        atoms::returned_function_call().encode(env),
+                        error_tuple,
+                        from,
+                    ],
+                );
+            }
+
+            let resource_any = match &results[0] {
+                Val::Resource(r) => r.clone(),
+                _ => {
+                    let error_msg = "Constructor did not return a resource".to_string();
+                    let error_tuple = env.error_tuple(error_msg);
+                    return make_tuple(
+                        env,
+                        &[
+                            atoms::returned_function_call().encode(env),
+                            error_tuple,
+                            from,
+                        ],
+                    );
+                }
+            };
+
+            // Create WasiResourceWrapper
+            let wrapper = WasiResourceWrapper::new(resource_any, store_id);
+            let resource_arc = ResourceArc::new(wrapper);
+
+            // Return success with resource handle
+            let result = make_tuple(env, &[atoms::ok().encode(env), resource_arc.encode(env)]);
+            make_tuple(
+                env,
+                &[atoms::returned_function_call().encode(env), result, from],
+            )
+        }
+        Err(err) => {
+            let error_msg = format!("Constructor call error: {:?}", err);
+            let error_tuple = env.error_tuple(error_msg);
+            make_tuple(
+                env,
+                &[
+                    atoms::returned_function_call().encode(env),
+                    error_tuple,
+                    from,
+                ],
+            )
+        }
+    }
+}
+
+fn parse_resource_path(path: Vec<String>) -> Result<(Vec<String>, String), String> {
+    // Handle different formats:
+    // 1. ["component:counter/types", "counter"] - interface + resource
+    // 2. ["counter"] - just resource name (use default interface)
+    // 3. ["wasi:http/types", "incoming-request"] - WASI resource
+    
+    if path.is_empty() {
+        return Err("Empty resource path".to_string());
+    }
+    
+    if path.len() == 1 {
+        // Just resource name, no interface specified
+        Ok((vec![], path[0].clone()))
+    } else {
+        // Interface path + resource name
+        let resource_name = path.last().unwrap().clone();
+        let interface_path = path[0..path.len()-1].to_vec();
+        Ok((interface_path, resource_name))
+    }
+}
+
+fn lookup_constructor(
+    instance: &wasmtime::component::Instance,
+    store: &mut Store<ComponentStoreData>,
+    interface_path: &[String],
+    constructor_name: &str,
+) -> Result<wasmtime::component::Func, String> {
+    // Navigate nested exports
+    let mut current_index = None;
+    
+    // First navigate to the interface
+    for segment in interface_path {
+        current_index = if let Some(index) = current_index {
+            instance.get_export(&mut *store, Some(&index), segment)
+                .map(|(_, idx)| idx)
+        } else {
+            instance.get_export(&mut *store, None, segment)
+                .map(|(_, idx)| idx)
+        };
+        
+        if current_index.is_none() {
+            return Err(format!("Interface segment '{}' not found", segment));
+        }
+    }
+    
+    // Now look for the constructor
+    let (_export, index) = instance.get_export(
+        &mut *store,
+        current_index.as_ref(),
+        constructor_name
+    ).ok_or_else(|| format!("Constructor '{}' not found", constructor_name))?;
+    
+    // Verify it's a function
+    instance.get_func(&mut *store, index)
+        .ok_or_else(|| format!("Export '{}' is not a function", constructor_name))
 }
