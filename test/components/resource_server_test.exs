@@ -22,7 +22,7 @@ defmodule Wasmex.Components.ResourceServerTest do
     test "initializes with correct state" do
       {:ok, pid} = ResourceServer.start_link(CounterResource, 42)
 
-      assert {:ok, 42} = ResourceServer.call_method(pid, "get-value", [])
+      assert {:ok, {:ok, 42}} = ResourceServer.call_method(pid, "get-value", [])
 
       ResourceServer.stop(pid)
     end
@@ -31,17 +31,17 @@ defmodule Wasmex.Components.ResourceServerTest do
       {:ok, pid} = ResourceServer.start_link(CounterResource, 10)
 
       # Increment without parameter
-      assert {:ok, 11} = ResourceServer.call_method(pid, "increment", [])
-      assert {:ok, 11} = ResourceServer.call_method(pid, "get-value", [])
+      assert {:ok, {:ok, 11}} = ResourceServer.call_method(pid, "increment", [])
+      assert {:ok, {:ok, 11}} = ResourceServer.call_method(pid, "get-value", [])
 
       # Increment with parameter
-      assert {:ok, 21} = ResourceServer.call_method(pid, "increment", [10])
-      assert {:ok, 21} = ResourceServer.call_method(pid, "get-value", [])
+      assert {:ok, {:ok, 21}} = ResourceServer.call_method(pid, "increment", [10])
+      assert {:ok, {:ok, 21}} = ResourceServer.call_method(pid, "get-value", [])
 
       # Decrement
-      assert {:ok, 20} = ResourceServer.call_method(pid, "decrement", [])
-      assert {:ok, 15} = ResourceServer.call_method(pid, "decrement", [5])
-      assert {:ok, 15} = ResourceServer.call_method(pid, "get-value", [])
+      assert {:ok, {:ok, 20}} = ResourceServer.call_method(pid, "decrement", [])
+      assert {:ok, {:ok, 15}} = ResourceServer.call_method(pid, "decrement", [5])
+      assert {:ok, {:ok, 15}} = ResourceServer.call_method(pid, "get-value", [])
 
       ResourceServer.stop(pid)
     end
@@ -49,9 +49,9 @@ defmodule Wasmex.Components.ResourceServerTest do
     test "reset method works" do
       {:ok, pid} = ResourceServer.start_link(CounterResource, 100)
 
-      assert {:ok, 100} = ResourceServer.call_method(pid, "get-value", [])
-      assert {:ok, 0} = ResourceServer.call_method(pid, "reset", [])
-      assert {:ok, 0} = ResourceServer.call_method(pid, "get-value", [])
+      assert {:ok, {:ok, 100}} = ResourceServer.call_method(pid, "get-value", [])
+      assert {:ok, {:ok, 0}} = ResourceServer.call_method(pid, "reset", [])
+      assert {:ok, {:ok, 0}} = ResourceServer.call_method(pid, "get-value", [])
 
       ResourceServer.stop(pid)
     end
@@ -63,9 +63,9 @@ defmodule Wasmex.Components.ResourceServerTest do
           %{initial_value: 0, name: "my-counter"}
         )
 
-      assert {:ok, "my-counter"} = ResourceServer.call_method(pid, "get-name", [])
-      assert {:ok, nil} = ResourceServer.call_method(pid, "set-name", ["new-name"])
-      assert {:ok, "new-name"} = ResourceServer.call_method(pid, "get-name", [])
+      assert {:ok, {:ok, "my-counter"}} = ResourceServer.call_method(pid, "get-name", [])
+      assert {:ok, :ok} = ResourceServer.call_method(pid, "set-name", ["new-name"])
+      assert {:ok, {:ok, "new-name"}} = ResourceServer.call_method(pid, "get-name", [])
 
       ResourceServer.stop(pid)
     end
@@ -82,7 +82,7 @@ defmodule Wasmex.Components.ResourceServerTest do
       ResourceServer.call_method(pid, "decrement", [])
       ResourceServer.call_method(pid, "set-name", ["renamed"])
 
-      assert {:ok, stats} = ResourceServer.call_method(pid, "get-stats", [])
+      assert {:ok, {:ok, stats}} = ResourceServer.call_method(pid, "get-stats", [])
       assert stats.value == 5
       assert stats.name == "renamed"
       assert stats.operation_count == 3
@@ -137,8 +137,8 @@ defmodule Wasmex.Components.ResourceServerTest do
       {:ok, pid2} = ResourceServer.start_link(CounterResource, 20)
 
       # Verify both are working
-      assert {:ok, 10} = ResourceServer.call_method(pid1, "get-value", [])
-      assert {:ok, 20} = ResourceServer.call_method(pid2, "get-value", [])
+      assert {:ok, {:ok, 10}} = ResourceServer.call_method(pid1, "get-value", [])
+      assert {:ok, {:ok, 20}} = ResourceServer.call_method(pid2, "get-value", [])
 
       # Trap exits so we don't crash the test process
       Process.flag(:trap_exit, true)
@@ -155,8 +155,8 @@ defmodule Wasmex.Components.ResourceServerTest do
 
       # Second resource should still work fine
       assert Process.alive?(pid2)
-      assert {:ok, 20} = ResourceServer.call_method(pid2, "get-value", [])
-      assert {:ok, 21} = ResourceServer.call_method(pid2, "increment", [])
+      assert {:ok, {:ok, 20}} = ResourceServer.call_method(pid2, "get-value", [])
+      assert {:ok, {:ok, 21}} = ResourceServer.call_method(pid2, "increment", [])
 
       ResourceServer.stop(pid2)
     end
@@ -165,7 +165,7 @@ defmodule Wasmex.Components.ResourceServerTest do
       {:ok, pid} = ResourceServer.start_link(CounterResource, 0)
 
       # This should work with a short timeout
-      assert {:ok, 0} = ResourceServer.call_method(pid, "get-value", [], 100)
+      assert {:ok, {:ok, 0}} = ResourceServer.call_method(pid, "get-value", [], 100)
 
       ResourceServer.stop(pid)
     end
@@ -251,10 +251,10 @@ defmodule Wasmex.Components.ResourceServerTest do
       # Call methods on all of them
       results =
         for {pid, i} <- Enum.with_index(pids, 1) do
-          {:ok, value} = ResourceServer.call_method(pid, "get-value", [])
+          {:ok, {:ok, value}} = ResourceServer.call_method(pid, "get-value", [])
           assert value == i
 
-          {:ok, new_value} = ResourceServer.call_method(pid, "increment", [10])
+          {:ok, {:ok, new_value}} = ResourceServer.call_method(pid, "increment", [10])
           assert new_value == i + 10
 
           new_value

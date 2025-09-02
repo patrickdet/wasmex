@@ -9,7 +9,7 @@ defmodule Wasmex.Test.Support.Examples.CounterResource do
 
   - Runs as a GenServer process
   - State is managed internally by the process
-  - No need to thread state through method returns
+  - Returns idiomatic {:ok, value} | {:error, reason} tuples
   - Automatic cleanup on process termination
   - Can crash without affecting other resources
 
@@ -21,10 +21,10 @@ defmodule Wasmex.Test.Support.Examples.CounterResource do
         %{initial_value: 10, name: "my-counter"}
       )
       
-      # Call methods
-      {:ok, 11} = ResourceServer.call_method(pid, "increment", [])
-      {:ok, 10} = ResourceServer.call_method(pid, "decrement", [])
-      {:ok, 10} = ResourceServer.call_method(pid, "get-value", [])
+      # Call methods - all return {:ok, value} or {:error, reason}
+      {:ok, {:ok, 11}} = ResourceServer.call_method(pid, "increment", [])
+      {:ok, {:ok, 10}} = ResourceServer.call_method(pid, "decrement", [])
+      {:ok, {:ok, 10}} = ResourceServer.call_method(pid, "get-value", [])
       
       # Process automatically cleans up on termination
   """
@@ -65,43 +65,43 @@ defmodule Wasmex.Test.Support.Examples.CounterResource do
   def handle_method("increment", [], state) do
     new_value = state.value + 1
     new_state = %State{state | value: new_value, operation_count: state.operation_count + 1}
-    {:reply, new_value, new_state}
+    {:reply, {:ok, new_value}, new_state}
   end
 
   def handle_method("increment", [amount], state) when is_integer(amount) do
     new_value = state.value + amount
     new_state = %State{state | value: new_value, operation_count: state.operation_count + 1}
-    {:reply, new_value, new_state}
+    {:reply, {:ok, new_value}, new_state}
   end
 
   def handle_method("decrement", [], state) do
     new_value = state.value - 1
     new_state = %State{state | value: new_value, operation_count: state.operation_count + 1}
-    {:reply, new_value, new_state}
+    {:reply, {:ok, new_value}, new_state}
   end
 
   def handle_method("decrement", [amount], state) when is_integer(amount) do
     new_value = state.value - amount
     new_state = %State{state | value: new_value, operation_count: state.operation_count + 1}
-    {:reply, new_value, new_state}
+    {:reply, {:ok, new_value}, new_state}
   end
 
   def handle_method("get-value", [], state) do
-    {:reply, state.value, state}
+    {:reply, {:ok, state.value}, state}
   end
 
   def handle_method("reset", [], state) do
     new_state = %State{state | value: 0, operation_count: state.operation_count + 1}
-    {:reply, 0, new_state}
+    {:reply, {:ok, 0}, new_state}
   end
 
   def handle_method("get-name", [], state) do
-    {:reply, state.name, state}
+    {:reply, {:ok, state.name}, state}
   end
 
   def handle_method("set-name", [new_name], state) when is_binary(new_name) do
     new_state = %State{state | name: new_name, operation_count: state.operation_count + 1}
-    {:noreply, new_state}
+    {:reply, :ok, new_state}
   end
 
   def handle_method("get-stats", [], state) do
@@ -112,7 +112,7 @@ defmodule Wasmex.Test.Support.Examples.CounterResource do
       process: self()
     }
 
-    {:reply, stats, state}
+    {:reply, {:ok, stats}, state}
   end
 
   def handle_method("crash", [], _state) do
