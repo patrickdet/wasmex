@@ -53,7 +53,6 @@ pub struct ExWasiP2Options {
     inherit_stderr: bool,
     allow_http: bool,
     allow_filesystem: Option<bool>,
-    allow_network: Option<bool>,
     preopen_dirs: Option<Vec<String>>,
 }
 
@@ -315,8 +314,8 @@ pub fn component_store_new_wasi(
         }
     }
 
-    // Enable network access (either through allow_network or allow_http)
-    if options.allow_network.unwrap_or(options.allow_http) || options.allow_http {
+    // Enable network access for HTTP
+    if options.allow_http {
         wasi_ctx_builder
             .inherit_network()
             .allow_ip_name_lookup(true);
