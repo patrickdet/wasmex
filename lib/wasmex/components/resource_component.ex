@@ -124,7 +124,7 @@ defmodule Wasmex.Components.ResourceComponent do
 
           # Call handle_method and handle all possible return values
           result = handle_method(method, params, unwrapped_state)
-          
+
           case result do
             {:reply, reply_value, new_state} ->
               {:reply, {:ok, reply_value}, wrap_state(new_state)}
@@ -146,12 +146,12 @@ defmodule Wasmex.Components.ResourceComponent do
           {_wrapped, unwrapped} = unwrap_state(state)
           on_terminate(reason, unwrapped)
         end
-        
+
         # Default on_terminate - override if you need cleanup
         def on_terminate(_reason, _state) do
           :ok
         end
-        
+
         defoverridable on_terminate: 2
 
         # Resource init callback - must be implemented by user

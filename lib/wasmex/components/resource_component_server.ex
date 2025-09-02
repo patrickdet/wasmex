@@ -139,12 +139,12 @@ defmodule Wasmex.Components.ResourceComponentServer do
           end
 
           def terminate(_reason, _state), do: :ok
-          
+
           # Default on_terminate - override if you need cleanup
           def on_terminate(_reason, _state) do
             :ok
           end
-          
+
           defoverridable on_terminate: 2
 
           # Internal helper for method calls

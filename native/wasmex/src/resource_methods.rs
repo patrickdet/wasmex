@@ -344,20 +344,21 @@ fn execute_resource_constructor(
 
     // Find the constructor function
     let constructor_name = format!("[constructor]{}", resource_name);
-    let function = match lookup_constructor(&instance, &mut store, &interface_path, &constructor_name) {
-        Ok(func) => func,
-        Err(err) => {
-            let error_tuple = env.error_tuple(err);
-            return make_tuple(
-                env,
-                &[
-                    atoms::returned_function_call().encode(env),
-                    error_tuple,
-                    from,
-                ],
-            );
-        }
-    };
+    let function =
+        match lookup_constructor(&instance, &mut store, &interface_path, &constructor_name) {
+            Ok(func) => func,
+            Err(err) => {
+                let error_tuple = env.error_tuple(err);
+                return make_tuple(
+                    env,
+                    &[
+                        atoms::returned_function_call().encode(env),
+                        error_tuple,
+                        from,
+                    ],
+                );
+            }
+        };
 
     // Convert parameters
     let param_types: Vec<wasmtime::component::Type> = function
@@ -390,7 +391,7 @@ fn execute_resource_constructor(
     match function.call(&mut *store, &wasm_params, &mut results) {
         Ok(_) => {
             match function.post_return(&mut *store) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(err) => {
                     let error_msg = format!("post_return error: {:?}", err);
                     let error_tuple = env.error_tuple(error_msg);
@@ -407,7 +408,10 @@ fn execute_resource_constructor(
 
             // Extract the resource from results
             if results.len() != 1 {
-                let error_msg = format!("Constructor returned {} values, expected 1 resource", results.len());
+                let error_msg = format!(
+                    "Constructor returned {} values, expected 1 resource",
+                    results.len()
+                );
                 let error_tuple = env.error_tuple(error_msg);
                 return make_tuple(
                     env,
@@ -466,18 +470,18 @@ fn parse_resource_path(path: Vec<String>) -> Result<(Vec<String>, String), Strin
     // 1. ["component:counter/types", "counter"] - interface + resource
     // 2. ["counter"] - just resource name (use default interface)
     // 3. ["wasi:http/types", "incoming-request"] - WASI resource
-    
+
     if path.is_empty() {
         return Err("Empty resource path".to_string());
     }
-    
+
     if path.len() == 1 {
         // Just resource name, no interface specified
         Ok((vec![], path[0].clone()))
     } else {
         // Interface path + resource name
         let resource_name = path.last().unwrap().clone();
-        let interface_path = path[0..path.len()-1].to_vec();
+        let interface_path = path[0..path.len() - 1].to_vec();
         Ok((interface_path, resource_name))
     }
 }
@@ -490,30 +494,31 @@ fn lookup_constructor(
 ) -> Result<wasmtime::component::Func, String> {
     // Navigate nested exports
     let mut current_index = None;
-    
+
     // First navigate to the interface
     for segment in interface_path {
         current_index = if let Some(index) = current_index {
-            instance.get_export(&mut *store, Some(&index), segment)
+            instance
+                .get_export(&mut *store, Some(&index), segment)
                 .map(|(_, idx)| idx)
         } else {
-            instance.get_export(&mut *store, None, segment)
+            instance
+                .get_export(&mut *store, None, segment)
                 .map(|(_, idx)| idx)
         };
-        
+
         if current_index.is_none() {
             return Err(format!("Interface segment '{}' not found", segment));
         }
     }
-    
+
     // Now look for the constructor
-    let (_export, index) = instance.get_export(
-        &mut *store,
-        current_index.as_ref(),
-        constructor_name
-    ).ok_or_else(|| format!("Constructor '{}' not found", constructor_name))?;
-    
+    let (_export, index) = instance
+        .get_export(&mut *store, current_index.as_ref(), constructor_name)
+        .ok_or_else(|| format!("Constructor '{}' not found", constructor_name))?;
+
     // Verify it's a function
-    instance.get_func(&mut *store, index)
+    instance
+        .get_func(&mut *store, index)
         .ok_or_else(|| format!("Export '{}' is not a function", constructor_name))
 }

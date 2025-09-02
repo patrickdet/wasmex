@@ -93,11 +93,6 @@ defmodule Wasmex.Components.ResourceBehaviour do
         {ResourceServer, {MyResource, args}},
         restart: :transient  # Only restart on crash
       )
-
-  Choose restart strategies based on resource characteristics:
-  - Critical resources (DB connections): `:permanent`
-  - Normal resources: `:transient`
-  - Ephemeral resources (temp files): `:temporary`
   """
 
   @doc """

@@ -75,11 +75,10 @@ defmodule Wasmex.Test.Support.Examples.CompleteComponentWithResources do
       # Clean up connection
       {:noreply, %{state | conn: nil}}
     end
-    
+
     def handle_method(method, _params, state) do
       {:error, "Unknown method: #{method}", state}
     end
-
   end
 
   # Cache resource with automatic method generation
@@ -107,7 +106,7 @@ defmodule Wasmex.Test.Support.Examples.CompleteComponentWithResources do
       new_state = %{state | data: Map.delete(state.data, key)}
       {:noreply, new_state}
     end
-    
+
     def handle_method(method, _params, state) do
       {:error, "Unknown method: #{method}", state}
     end
