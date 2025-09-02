@@ -83,31 +83,19 @@ defmodule Wasmex.Components.WasiInterfaceTest do
       assert store.resource
     end
 
-    test "explicitly enables network access" do
+    test "network access controlled via allow_http" do
+      # Network access is enabled via allow_http
       wasi_opts = %WasiP2Options{
-        allow_network: true,
-        allow_http: false
-      }
-
-      assert {:ok, store} = Store.new_wasi(wasi_opts)
-      assert store.resource
-    end
-
-    test "explicitly disables network access" do
-      wasi_opts = %WasiP2Options{
-        allow_network: false,
-        allow_http: false
-      }
-
-      assert {:ok, store} = Store.new_wasi(wasi_opts)
-      assert store.resource
-    end
-
-    test "allow_http overrides allow_network when both specified" do
-      wasi_opts = %WasiP2Options{
-        allow_network: false,
-        # This should enable network
         allow_http: true
+      }
+
+      assert {:ok, store} = Store.new_wasi(wasi_opts)
+      assert store.resource
+    end
+
+    test "network access disabled by default" do
+      wasi_opts = %WasiP2Options{
+        allow_http: false
       }
 
       assert {:ok, store} = Store.new_wasi(wasi_opts)
@@ -182,7 +170,6 @@ defmodule Wasmex.Components.WasiInterfaceTest do
         inherit_stderr: true,
         allow_http: true,
         allow_filesystem: true,
-        allow_network: true,
         preopen_dirs: [System.tmp_dir!()],
         args: ["test"],
         env: %{"TEST" => "1"}
@@ -213,9 +200,9 @@ defmodule Wasmex.Components.WasiInterfaceTest do
 
     @tag :wasi_component
     test "network interface is available when enabled" do
-      # This would require a test component that uses sockets
+      # Network access is controlled via allow_http
       wasi_opts = %WasiP2Options{
-        allow_network: true
+        allow_http: true
       }
 
       assert {:ok, store} = Store.new_wasi(wasi_opts)
