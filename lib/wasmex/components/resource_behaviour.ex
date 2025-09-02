@@ -26,36 +26,45 @@ defmodule Wasmex.Components.ResourceBehaviour do
 
   ## Full Example Implementation
 
-      defmodule MyApp.DatabaseResource do
+      defmodule MyApp.CounterResource do
         @behaviour Wasmex.Components.ResourceBehaviour
 
-        defstruct [:conn, :query_count]
+        defstruct [:value, :increment_count]
 
         @impl true
-        def type_name, do: "database-connection"
+        def type_name, do: "counter"
 
         @impl true
-        def init(database_name) do
-          case MyApp.Database.connect(database_name) do
-            {:ok, conn} ->
-              {:ok, %__MODULE__{conn: conn, query_count: 0}}
-            {:error, reason} ->
-              {:error, reason}
-          end
+        def init(initial_value) when is_integer(initial_value) do
+          {:ok, %__MODULE__{value: initial_value, increment_count: 0}}
+        end
+
+        def init(_) do
+          {:error, "Counter requires an integer initial value"}
         end
 
         @impl true
-        def handle_method("query", [sql], state) do
-          result = MyApp.Database.query(state.conn, sql)
-          new_state = %{state | query_count: state.query_count + 1}
-          {:reply, result, new_state}
+        def handle_method("increment", [], state) do
+          new_value = state.value + 1
+          new_state = %{state | value: new_value, increment_count: state.increment_count + 1}
+          {:reply, new_value, new_state}
+        end
+
+        @impl true
+        def handle_method("get-value", [], state) do
+          {:reply, state.value, state}
+        end
+
+        @impl true
+        def handle_method("reset", [new_value], state) when is_integer(new_value) do
+          {:reply, :ok, %{state | value: new_value}}
         end
 
         @impl true
         def handle_method("get-stats", [], state) do
           stats = %{
-            query_count: state.query_count,
-            connected: MyApp.Database.connected?(state.conn)
+            current_value: state.value,
+            total_increments: state.increment_count
           }
           {:reply, stats, state}
         end
@@ -66,8 +75,8 @@ defmodule Wasmex.Components.ResourceBehaviour do
         end
 
         @impl true
-        def terminate(_reason, state) do
-          MyApp.Database.close(state.conn)
+        def terminate(_reason, _state) do
+          # Counters don't need cleanup
           :ok
         end
       end

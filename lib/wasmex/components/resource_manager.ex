@@ -8,7 +8,7 @@ defmodule Wasmex.Components.ResourceManager do
   ## Usage
 
       # Define a resource module that implements ResourceBehaviour
-      defmodule MyApp.DatabaseResource do
+      defmodule MyApp.CounterResource do
         @behaviour Wasmex.Components.ResourceBehaviour
         # ... implementation
       end
@@ -16,12 +16,12 @@ defmodule Wasmex.Components.ResourceManager do
       # Create a resource
       {:ok, handle} = ResourceManager.create_resource(
         store,
-        MyApp.DatabaseResource,
-        "production_db"
+        MyApp.CounterResource,
+        42  # initial value
       )
 
       # Pass the handle to a WASM function
-      Wasmex.Components.Instance.call_function(instance, "process-data", [handle], from)
+      Wasmex.Components.Instance.call_function(instance, "process-counter", [handle], from)
 
       # Resource automatically cleans up when its process terminates
   """

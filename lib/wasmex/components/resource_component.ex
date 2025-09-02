@@ -45,10 +45,10 @@ defmodule Wasmex.Components.ResourceComponent do
   ```elixir
   # Create a resource that can be passed to WASM
   {:ok, store} = Wasmex.Components.Store.new()
-  {:ok, handle} = MyApp.DatabaseResource.create_for_wasm(store, "postgres://...")
+  {:ok, handle} = MyApp.CounterResource.create_for_wasm(store, 0)
 
-  # Pass to WASM component
-  Wasmex.Components.Instance.call_function(instance, "process-data", [handle])
+  # Pass to WASM component that expects a counter resource
+  Wasmex.Components.Instance.call_function(instance, "process-counter", [handle])
   ```
   """
 

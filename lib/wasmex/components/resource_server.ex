@@ -5,10 +5,10 @@ defmodule Wasmex.Components.ResourceServer do
   ## Basic Usage
 
       # Start a resource
-      {:ok, pid} = ResourceServer.start_link(MyApp.DatabaseResource, "production_db")
+      {:ok, pid} = ResourceServer.start_link(MyApp.CounterResource, 0)
 
       # Call methods on the resource
-      {:ok, result} = ResourceServer.call_method(pid, "query", ["SELECT * FROM users"])
+      {:ok, result} = ResourceServer.call_method(pid, "increment", [])
 
       # Resource automatically cleans up when process terminates
       ResourceServer.stop(pid)  # or let supervision tree handle it
@@ -29,7 +29,7 @@ defmodule Wasmex.Components.ResourceServer do
             # Your other application children...
 
             # Supervised resources with different restart strategies
-            {ResourceServer, {DatabaseResource, "prod"}, restart: :permanent},
+            {ResourceServer, {CounterResource, 0}, restart: :permanent},
             {ResourceServer, {CacheResource, %{ttl: 3600}}, restart: :transient},
             {ResourceServer, {TempFileResource, "/tmp/upload"}, restart: :temporary}
           ]
